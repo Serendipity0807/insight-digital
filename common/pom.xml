@@ -19,4 +19,13 @@
     <description>通用模块:统一响应体、全局异常、工具类(纯库 jar,没有 main 方法)</description>
 
     <!-- 依赖在写第一个类(统一响应体 Result)时再加 -->
+    <dependencies>
+        <!-- Lombok:编译期生成 getter/setter/构造器;provided = 只编译期用,不打进包、不外泄 -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.34</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
 </project>

@@ -64,6 +64,21 @@
                 <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
                 <version>${mybatis-plus.version}</version>
             </dependency>
+            <!-- 内部模块:统一登记版本,子模块互相依赖就不用写版本号 -->
+            <dependency>
+                <groupId>com.insight</groupId>
+                <artifactId>insight-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
+    <dependencies>
+        <!-- Lombok:编译期生成 getter/setter/构造器;provided = 只编译期用,不打进包、不外泄 -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.34</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
 </project>

@@ -22,6 +22,11 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+        <!-- 内部模块依赖:用 common 的统一响应体 Result(版本继承自父 POM) -->
+        <dependency>
+            <groupId>com.insight</groupId>
+            <artifactId>insight-common</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
