@@ -1,6 +1,8 @@
 package com.insight.product.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.insight.common.exception.BusinessException;
+import com.insight.common.exception.ErrorCode;
 import com.insight.product.dto.ProductDetailVO;
 import com.insight.product.entity.Sku;
 import com.insight.product.entity.Spu;
@@ -26,7 +28,7 @@ public class ProductService {
         // 1. 查 SPU
         Spu spu = spuMapper.selectById(id);
         if (spu == null) {
-            return null; // 不存在,由 Controller 转成错误响应
+            throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
         }
         // 2. 查该 SPU 下的所有 SKU(类型安全的条件构造器)
         List<Sku> skus = skuMapper.selectList(
