@@ -1,0 +1,15 @@
+# IDEA
+.idea/
+*.iml
+
+# Maven
+target/
+
+# 前端
+node_modules/
+dist/
+
+# 日志与系统
+*.log
+.DS_Store
+Thumbs.db
