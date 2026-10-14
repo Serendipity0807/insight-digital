@@ -8,12 +8,14 @@ import com.insight.product.entity.Sku;
 import com.insight.product.entity.Spu;
 import com.insight.product.mapper.SkuMapper;
 import com.insight.product.mapper.SpuMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class ProductService {
 
@@ -25,6 +27,7 @@ public class ProductService {
 
     /** 按 id 查询商品详情(SPU + 该 SPU 下所有 SKU) */
     public ProductDetailVO detail(Long id) {
+        log.info("查询商品详情, id={}", id);
         // 1. 查 SPU
         Spu spu = spuMapper.selectById(id);
         if (spu == null) {

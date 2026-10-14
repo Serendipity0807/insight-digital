@@ -18,15 +18,7 @@
     <name>insight-common</name>
     <description>通用模块:统一响应体、全局异常、工具类(纯库 jar,没有 main 方法)</description>
 
-    <!-- 依赖在写第一个类(统一响应体 Result)时再加 -->
     <dependencies>
-        <!-- Lombok:编译期生成 getter/setter/构造器;provided = 只编译期用,不打进包、不外泄 -->
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <version>1.18.34</version>
-            <scope>provided</scope>
-        </dependency>
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-web</artifactId>
@@ -34,6 +26,16 @@
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-context</artifactId>
+        </dependency>
+        <!-- 日志门面:@Slf4j 要用(实现由各服务的 logback 提供) -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+        <!-- Bean Validation 规范 API:统一处理参数校验异常 -->
+        <dependency>
+            <groupId>jakarta.validation</groupId>
+            <artifactId>jakarta.validation-api</artifactId>
         </dependency>
     </dependencies>
 </project>
