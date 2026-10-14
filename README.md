@@ -1,6 +1,6 @@
 # Insight Digital(慧眼数码)
 
-> 大型电商学习项目:Java 微服务 + AI Agent(阶段⑦)
+> 大型电商学习项目:Java 微服务 + AI Agent
 
 ## 技术栈
 

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.insight</groupId>
+        <artifactId>insight-digital</artifactId>
+        <version>1.0.0</version>
+        <!-- 关键差异:mall-product 在 services/ 子目录下,要往上跳两级到根 pom -->
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mall-product</artifactId>
+    <name>mall-product</name>
+    <description>商品服务:SPU/SKU、分类、品牌</description>
+
+    <dependencies>
+        <!-- starter-web:一个坐标 = web + mvc + 内嵌 Tomcat + Jackson 整套 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- repackage:把 jar 打成"可执行 fat jar",java -jar 直接能跑 -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>${spring-boot.version}</version>
+            </plugin>
+        </plugins>
+    </build>
+</project>
