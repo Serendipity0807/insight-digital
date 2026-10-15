@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import ProductCard from '../components/product/ProductCard.vue'
+import CompareBar from '../components/product/CompareBar.vue'
 import { getProductPage } from '../api/product'
 
 // 首页精选:从后端分页接口拿真数据(替代原来的 mock)
@@ -166,9 +167,12 @@ const scrollToFeatured = () => {
           <h2>慧眼对比</h2>
           <p>勾选两款,左右分屏。差异,一眼看清。</p>
         </div>
-        <button class="btn-primary" disabled title="第 3 步上线">开始对比 · 即将上线</button>
+        <button class="btn-primary" @click="scrollToFeatured">去挑选商品</button>
       </div>
     </section>
+
+    <!-- 慧眼对比悬浮条:勾选商品后浮现 -->
+    <CompareBar />
   </div>
 </template>
 

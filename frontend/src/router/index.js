@@ -12,8 +12,14 @@ const router = createRouter({
       name: 'product-detail',
       // 懒加载:详情页代码在用户真正点进去时才下载,首屏更快
       component: () => import('../views/ProductDetailView.vue')
+    },
+    {
+      path: '/compare',
+      name: 'compare',
+      // 懒加载:对比页代码在用户真正开始对比时才下载
+      component: () => import('../views/CompareView.vue')
     }
-    // 预留:/compare 慧眼对比(第 3 步)、/cart 购物车(第 4 步)、/checkout 结算(第 5 步)
+    // 预留:/cart 购物车(第 4 步)、/checkout 结算(第 5 步)
   ]
 })
 

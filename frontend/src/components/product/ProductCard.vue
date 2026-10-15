@@ -2,12 +2,15 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { formatPrice } from '../../utils/format'
+import { useCompareStore } from '../../stores/compare'
 
 const props = defineProps({
   product: { type: Object, required: true }
 })
 
 const router = useRouter()
+const store = useCompareStore()
+const isCompared = computed(() => store.items.some((x) => x.id === props.product.id))
 
 // 价格:列表接口直接给 minPrice(分);兜底(万一走 mock)从 skus 取最低
 const minPrice = computed(() => {
@@ -34,6 +37,14 @@ const addToCart = () => {}
       <div class="spotlight"></div>
       <span class="glyph">{{ product.name.charAt(0) }}</span>
       <span v-if="product.tag" class="tag-chip">{{ product.tag }}</span>
+      <button
+        class="compare-toggle"
+        :class="{ on: isCompared }"
+        :title="isCompared ? '移出对比' : '加入对比'"
+        @click.stop="store.toggle(product)"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="4" width="8" height="16" rx="1.5" /><rect x="13" y="4" width="8" height="16" rx="1.5" /></svg>
+      </button>
     </div>
 
     <div class="card-body">
@@ -114,6 +125,36 @@ const addToCart = () => {}
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
+
+/* 对比勾选:右上角,悬停浮现;选中后常驻 */
+.compare-toggle {
+  position: absolute;
+  top: var(--s-4);
+  right: var(--s-4);
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  color: var(--c-text-dim);
+  background: rgba(11, 14, 18, 0.6);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-pill);
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    opacity var(--t-fast) var(--ease-out),
+    transform var(--t-fast) var(--ease-out),
+    color var(--t-fast) var(--ease-out),
+    border-color var(--t-fast) var(--ease-out);
+}
+.card:hover .compare-toggle { opacity: 1; transform: translateY(0); }
+.compare-toggle.on {
+  opacity: 1;
+  transform: translateY(0);
+  color: var(--c-accent-2);
+  border-color: rgba(33, 212, 196, 0.5);
+}
+.compare-toggle svg { width: 16px; height: 16px; }
 
 /* —— 信息区:名字 + 一句话卖点 + 价格 —— */
 .card-body { padding: var(--s-5); }
