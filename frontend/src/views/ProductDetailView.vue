@@ -33,6 +33,23 @@ const originalPrice = computed(() => formatPrice(selectedSku.value?.originalPric
 const sales = computed(() => (detail.value?.sales ?? 0).toLocaleString('zh-CN'))
 const hue = computed(() => (detail.value?.id ?? 0) % 360)
 
+// 参数表:后端 specParams 是 JSON 字符串,前端做防御性解析(脏数据不崩页面)
+const params = computed(() => {
+  const raw = detail.value?.specParams
+  if (!raw) return []
+  try {
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? arr : []
+  } catch {
+    return []
+  }
+})
+// 文本参数 → 色块;数值参数(type=meter) → 进度条
+const textParams = computed(() => params.value.filter((p) => p.type !== 'meter'))
+const meterParams = computed(() => params.value.filter((p) => p.type === 'meter'))
+// 进度条百分比:value / max,夹在 0~100 之间,防脏数据溢出
+const meterPct = (p) => Math.min(100, Math.round(((p.value || 0) / (p.max || 100)) * 100))
+
 // 第 4 步:接入购物车 / 下单流程
 const addToCart = () => {}
 const buyNow = () => {}
@@ -129,10 +146,28 @@ const buyNow = () => {}
         </div>
       </div>
 
-      <!-- 参数可视化占位:第 2 步落地 -->
-      <div class="params glass">
+      <!-- 参数可视化:色块(text)+ 计量条(meter),数据来自后端 specParams -->
+      <div v-if="params.length" class="params glass">
         <h2>参数可视化</h2>
-        <p>续航柱状图、处理器跑分对比…… 将在下一步落地(数据来自后端 attributes)。</p>
+
+        <!-- 文本参数:色块 -->
+        <div class="param-grid">
+          <div v-for="(p, i) in textParams" :key="'t' + i" class="param-chip">
+            <span class="param-label">{{ p.label }}</span>
+            <span class="param-value">{{ p.value }}</span>
+          </div>
+        </div>
+
+        <!-- 数值参数:进度条 -->
+        <div v-for="(p, i) in meterParams" :key="'m' + i" class="param-meter">
+          <div class="meter-head">
+            <span class="param-label">{{ p.label }}</span>
+            <span class="meter-num">{{ p.value }}<em>{{ p.unit }}</em></span>
+          </div>
+          <div class="meter-track">
+            <div class="meter-fill" :style="{ width: meterPct(p) + '%' }"></div>
+          </div>
+        </div>
       </div>
     </template>
   </div>
@@ -296,14 +331,69 @@ const buyNow = () => {}
 }
 .badges svg { width: 16px; height: 16px; color: var(--c-accent-2); }
 
-/* —— 参数可视化占位 —— */
+/* —— 参数可视化 —— */
 .params {
   margin-top: var(--s-10);
   padding: var(--s-8);
   border-radius: var(--r-xl);
 }
-.params h2 { font-size: 20px; font-weight: 300; letter-spacing: 2px; }
-.params p { margin-top: var(--s-2); font-size: 13px; color: var(--c-text-dim); }
+.params h2 {
+  font-size: 20px;
+  font-weight: 300;
+  letter-spacing: 2px;
+  margin-bottom: var(--s-6);
+}
+
+/* 文本参数:色块 */
+.param-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--s-3);
+}
+.param-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--s-4) var(--s-5);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+}
+.param-label { font-size: 12px; color: var(--c-text-faint); letter-spacing: 1px; }
+.param-value { font-size: 15px; color: var(--c-text); }
+
+/* 数值参数:进度条 */
+.param-meter { margin-top: var(--s-5); }
+.meter-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: var(--s-3);
+}
+.meter-num {
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--c-accent-2);
+}
+.meter-num em {
+  font-size: 12px;
+  font-style: normal;
+  color: var(--c-text-faint);
+  margin-left: 4px;
+}
+.meter-track {
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+.meter-fill {
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--c-gradient);
+  transition: width var(--t-slow) var(--ease-out);
+}
 
 @media (max-width: 900px) {
   .detail-grid { grid-template-columns: 1fr; }
