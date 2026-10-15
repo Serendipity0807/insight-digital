@@ -38,4 +38,11 @@ public class Spu {
 
     @TableLogic
     private Integer deleted;
+
+    /** 慧眼点评标签(如"影像旗舰"),阶段⑦ 由内容 Agent 生成 */
+    private String tag;
+
+    /** 一句话卖点(如"A17 Pro 芯片 · 钛金属机身") */
+    private String tagline;
+
 }

@@ -50,7 +50,8 @@ public class ProductService {
 
         return new ProductDetailVO(
                 spu.getId(), spu.getName(), spu.getMainImage(),
-                spu.getDescription(), spu.getSales(), skuVOs);
+                spu.getDescription(), spu.getSales(),
+                spu.getTag(), spu.getTagline(), skuVOs);
     }
 
     /** 分页查询商品列表(默认按销量倒序,只查在售) */
@@ -81,7 +82,8 @@ public class ProductService {
         List<ProductListItemVO> records = spus.stream()
                 .map(s -> new ProductListItemVO(
                         s.getId(), s.getName(), s.getMainImage(),
-                        s.getSales(), minPriceMap.getOrDefault(s.getId(), 0)))
+                        s.getSales(), minPriceMap.getOrDefault(s.getId(), 0),
+                        s.getTag(), s.getTagline()))
                 .collect(Collectors.toList());
         return PageResult.of(pageResult.getTotal(), records);
     }

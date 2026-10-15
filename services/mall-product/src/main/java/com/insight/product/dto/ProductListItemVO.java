@@ -18,4 +18,6 @@ public class ProductListItemVO {
     private String mainImage;
     private Integer sales;
     private Integer minPrice;
+    private String tag;      // 慧眼点评标签
+    private String tagline;  // 一句话卖点
 }

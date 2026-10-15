@@ -19,6 +19,8 @@ public class ProductDetailVO {
     private String mainImage;
     private String description;
     private Integer sales;
+    private String tag;      // 慧眼点评标签
+    private String tagline;  // 一句话卖点
     private List<SkuVO> skus;
 
     /** SKU 子结构 */
