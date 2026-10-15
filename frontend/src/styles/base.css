@@ -1,0 +1,134 @@
+/* ============================================================
+   全局基础样式:reset + 通用工具类 + 全站按钮
+   ============================================================ */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--c-bg);
+  color: var(--c-text);
+  -webkit-font-smoothing: antialiased;
+  /* 深空底色 + 顶部环境光:像体验馆暗场里的两盏射灯 */
+  background-image:
+    radial-gradient(1200px 600px at 75% -10%, rgba(46, 107, 255, 0.10), transparent 60%),
+    radial-gradient(900px 500px at 10% 5%, rgba(33, 212, 196, 0.06), transparent 55%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; }
+img { display: block; max-width: 100%; }
+
+::selection {
+  background: rgba(46, 107, 255, 0.4);
+}
+
+:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+}
+
+/* 暗场定制滚动条 */
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: var(--r-pill);
+}
+::-webkit-scrollbar-track { background: transparent; }
+
+/* —— 毛玻璃通用工具类 —— */
+.glass {
+  background: var(--c-glass);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  border: 1px solid var(--c-border);
+}
+
+/* —— 容器:统一左右留白(大量留白的实现) —— */
+.container {
+  width: min(var(--container-w), 100% - 48px);
+  margin-inline: auto;
+}
+
+/* —— 数字(价格/参数):等宽数字,变化时不跳动 —— */
+.num { font-variant-numeric: tabular-nums; }
+
+/* —— 渐变文字(关键标题词) —— */
+.text-accent {
+  background: var(--c-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* —— 按钮(全站统一,两档) —— */
+.btn-primary {
+  background: var(--c-gradient);
+  color: #fff;
+  border: none;
+  border-radius: var(--r-pill);
+  padding: 14px 32px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  box-shadow: 0 4px 20px rgba(46, 107, 255, 0.35);
+  transition:
+    transform var(--t-fast) var(--ease-out),
+    box-shadow var(--t-fast) var(--ease-out),
+    filter var(--t-fast) var(--ease-out);
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+  box-shadow: 0 8px 28px rgba(46, 107, 255, 0.5);
+}
+.btn-primary:active { transform: translateY(0) scale(0.98); }
+.btn-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: none;
+  transform: none;
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--c-border-strong);
+  color: var(--c-text);
+  border-radius: var(--r-pill);
+  padding: 13px 30px;
+  font-size: 15px;
+  letter-spacing: 1px;
+  transition:
+    border-color var(--t-fast) var(--ease-out),
+    background var(--t-fast) var(--ease-out);
+}
+.btn-ghost:hover {
+  border-color: var(--c-accent);
+  background: rgba(46, 107, 255, 0.08);
+}
+
+/* —— 骨架屏(第 2 步接入 API 时启用):
+   简报要求加载态用灰色呼吸块占位,禁用转圈,先把工具类备好 —— */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.10) 50%,
+    rgba(255, 255, 255, 0.04) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-wave 1.6s var(--ease-out) infinite;
+}
+@keyframes skeleton-wave {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}

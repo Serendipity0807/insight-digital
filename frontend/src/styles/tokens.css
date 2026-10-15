@@ -1,0 +1,57 @@
+/* ============================================================
+   慧眼数码 · 设计令牌(Design Tokens)
+   全站唯一的"设计真相源":颜色 / 间距 / 圆角 / 光影 / 动效 / 字体
+   只改这里,全站生效。后续所有页面必须从这里取值,
+   禁止在组件里写死色值,否则设计系统会慢慢长成杂草。
+   ============================================================ */
+:root {
+  /* —— 底色:碳黑 / 深空灰(暗场体验馆:珠宝需要黑丝绒) —— */
+  --c-bg: #0b0e12;
+  --c-bg-raised: #12161d;
+  --c-glass: rgba(255, 255, 255, 0.05);
+  --c-glass-strong: rgba(255, 255, 255, 0.09);
+  --c-border: rgba(255, 255, 255, 0.09);
+  --c-border-strong: rgba(255, 255, 255, 0.18);
+
+  /* —— 文字:极简白三级(主/次/弱) —— */
+  --c-text: #eef2f7;
+  --c-text-dim: #9aa6b5;
+  --c-text-faint: #5d6b7c;
+
+  /* —— 点缀色:只做焦点(按钮 / 状态 / 标签),绝不铺满 —— */
+  --c-accent: #2e6bff;   /* 科技蓝:关键按钮(立即购买/加入购物车) */
+  --c-accent-2: #21d4c4; /* 极光青:状态提示、标签、AI 入口 */
+  --c-gradient: linear-gradient(135deg, #2e6bff 0%, #21d4c4 100%);
+
+  /* —— 语义色 —— */
+  --c-success: #2fd08a;
+  --c-danger: #ff5c6c;
+
+  /* —— 间距(4px 基准) —— */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 20px; --s-6: 24px; --s-7: 32px; --s-8: 40px;
+  --s-9: 48px; --s-10: 64px; --s-12: 96px;
+
+  /* —— 圆角 —— */
+  --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 24px;
+  --r-pill: 999px;
+
+  /* —— 光影(暗场里用"光"代替"影") —— */
+  --glow-card: 0 12px 40px rgba(0, 0, 0, 0.45);
+  --glow-accent: 0 0 24px rgba(46, 107, 255, 0.4);
+  --glow-cyan: 0 0 24px rgba(33, 212, 196, 0.35);
+
+  /* —— 动效:指数缓出,顺滑跟手的秘密 —— */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --t-fast: 150ms;
+  --t-base: 280ms;
+  --t-slow: 520ms;
+
+  /* —— 字体 —— */
+  --font-sans: "HarmonyOS Sans SC", "MiSans", "PingFang SC",
+    "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif;
+
+  /* —— 布局 —— */
+  --header-h: 64px;
+  --container-w: 1200px;
+}
