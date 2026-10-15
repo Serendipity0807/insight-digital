@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { formatPrice } from '../../utils/format'
 
 const props = defineProps({
   product: { type: Object, required: true }
@@ -8,11 +9,16 @@ const props = defineProps({
 
 const router = useRouter()
 
-// 起售价 = 所有 SKU 的最低价(分 → 元,千分位)
+// 价格:列表接口直接给 minPrice(分);兜底(万一走 mock)从 skus 取最低
 const minPrice = computed(() => {
-  const min = Math.min(...props.product.skus.map((s) => s.price))
-  return (min / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
+  const raw =
+    props.product.minPrice ??
+    (props.product.skus?.length ? Math.min(...props.product.skus.map((s) => s.price)) : null)
+  return formatPrice(raw)
 })
+
+// 占位图聚光灯色相:真实数据没有 hue,用 id 派生一个稳定颜色
+const hue = computed(() => props.product.hue ?? (props.product.id ?? 0) % 360)
 
 const goDetail = () => router.push(`/product/${props.product.id}`)
 
@@ -23,11 +29,11 @@ const addToCart = () => {}
 <template>
   <article class="card" @click="goDetail">
     <!-- 商品图区:暂无真实图片,先用"聚光灯 + 品名首字"占位;
-         第 2 步换成真实主图,并加骨架屏加载态 -->
-    <div class="card-media" :style="{ '--hue': product.hue }">
+         以后换成真实主图,并加骨架屏加载态 -->
+    <div class="card-media" :style="{ '--hue': hue }">
       <div class="spotlight"></div>
       <span class="glyph">{{ product.name.charAt(0) }}</span>
-      <span class="tag-chip">{{ product.tag }}</span>
+      <span v-if="product.tag" class="tag-chip">{{ product.tag }}</span>
     </div>
 
     <div class="card-body">

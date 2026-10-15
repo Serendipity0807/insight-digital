@@ -51,7 +51,7 @@ public class ProductService {
         return new ProductDetailVO(
                 spu.getId(), spu.getName(), spu.getMainImage(),
                 spu.getDescription(), spu.getSales(),
-                spu.getTag(), spu.getTagline(), skuVOs);
+                spu.getTag(), spu.getTagline(), spu.getSpecParams(), skuVOs);
     }
 
     /** 分页查询商品列表(默认按销量倒序,只查在售) */

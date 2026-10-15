@@ -21,6 +21,7 @@ public class ProductDetailVO {
     private Integer sales;
     private String tag;      // 慧眼点评标签
     private String tagline;  // 一句话卖点
+    private String specParams; // 参数表(JSON 字符串,前端解析)
     private List<SkuVO> skus;
 
     /** SKU 子结构 */

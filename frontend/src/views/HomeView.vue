@@ -1,6 +1,27 @@
 <script setup>
+import { ref, onMounted } from 'vue'
 import ProductCard from '../components/product/ProductCard.vue'
-import { products } from '../mock/products'
+import { getProductPage } from '../api/product'
+
+// 首页精选:从后端分页接口拿真数据(替代原来的 mock)
+const products = ref([])
+const loading = ref(true)
+const error = ref('')
+
+const loadProducts = async () => {
+  loading.value = true
+  error.value = ''
+  try {
+    const data = await getProductPage({ page: 1, size: 12 })
+    products.value = data.records
+  } catch (e) {
+    error.value = e.message || '加载失败'
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(loadProducts)
 
 const scrollToFeatured = () => {
   document.getElementById('featured')?.scrollIntoView({ behavior: 'smooth' })
@@ -115,7 +136,25 @@ const scrollToFeatured = () => {
         </div>
         <a class="btn-ghost glass" href="#">查看全部</a>
       </header>
-      <div class="grid">
+
+      <!-- 加载态:骨架屏(占位块,不转圈) -->
+      <div v-if="loading" class="grid">
+        <div v-for="i in 6" :key="i" class="card-skeleton skeleton"></div>
+      </div>
+
+      <!-- 失败态:可重试 -->
+      <div v-else-if="error" class="state">
+        <p>{{ error }}</p>
+        <button class="btn-ghost glass" @click="loadProducts">重新加载</button>
+      </div>
+
+      <!-- 空态 -->
+      <div v-else-if="!products.length" class="state">
+        <p>暂无在售商品</p>
+      </div>
+
+      <!-- 数据 -->
+      <div v-else class="grid">
         <ProductCard v-for="p in products" :key="p.id" :product="p" />
       </div>
     </section>
@@ -261,6 +300,16 @@ const scrollToFeatured = () => {
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: var(--s-5);
 }
+.card-skeleton {
+  height: 360px;
+  border-radius: var(--r-lg);
+}
+.state {
+  padding: var(--s-10) 0;
+  text-align: center;
+  color: var(--c-text-dim);
+}
+.state p { margin-bottom: var(--s-5); }
 
 /* ===== 对比预告 ===== */
 .compare-teaser { margin-top: var(--s-12); }

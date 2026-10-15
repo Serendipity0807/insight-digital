@@ -45,4 +45,7 @@ public class Spu {
     /** 一句话卖点(如"A17 Pro 芯片 · 钛金属机身") */
     private String tagline;
 
+    /** 参数表(技术参数,驱动参数可视化),JSON 字符串 */
+    private String specParams;
+
 }
