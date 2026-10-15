@@ -4,6 +4,10 @@ server:
 spring:
   application:
     name: mall-product
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
   datasource:
     url: jdbc:mysql://localhost:3306/mall_product?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     username: root
