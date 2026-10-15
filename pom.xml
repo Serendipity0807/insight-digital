@@ -64,6 +64,12 @@
                 <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
                 <version>${mybatis-plus.version}</version>
             </dependency>
+            <!-- MyBatis-Plus 分页插件:3.5.9 起拆分的独立模块,版本必须与 starter 一致 -->
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-jsqlparser</artifactId>
+                <version>${mybatis-plus.version}</version>
+            </dependency>
             <!-- 内部模块:统一登记版本,子模块互相依赖就不用写版本号 -->
             <dependency>
                 <groupId>com.insight</groupId>

@@ -32,6 +32,11 @@
             <groupId>com.baomidou</groupId>
             <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
         </dependency>
+        <!-- 分页插件(PaginationInnerInterceptor):3.5.9 起需要单独引入 -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-jsqlparser</artifactId>
+        </dependency>
         <!-- MySQL 驱动(版本由 Boot BOM 管理;runtime = 只运行时需要) -->
         <dependency>
             <groupId>com.mysql</groupId>

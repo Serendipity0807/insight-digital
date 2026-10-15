@@ -11,7 +11,12 @@ import com.insight.product.mapper.SpuMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.insight.common.result.PageResult;
+import com.insight.product.dto.ProductListItemVO;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -47,4 +52,38 @@ public class ProductService {
                 spu.getId(), spu.getName(), spu.getMainImage(),
                 spu.getDescription(), spu.getSales(), skuVOs);
     }
+
+    /** 分页查询商品列表(默认按销量倒序,只查在售) */
+    public PageResult<ProductListItemVO> page(int page, int size) {
+        log.info("分页查询商品列表, page={}, size={}", page, size);
+        // 1. 分页查 SPU:new Page<>(当前页, 每页条数),页码从 1 开始
+        Page<Spu> pageResult = spuMapper.selectPage(
+                new Page<>(page, size),
+                new LambdaQueryWrapper<Spu>()
+                        .eq(Spu::getStatus, 1)        // 只查在售
+                        .orderByDesc(Spu::getSales)   // 排序规则暂用销量倒序占位
+        );
+        List<Spu> spus = pageResult.getRecords();
+        if (spus.isEmpty()) {
+            return PageResult.of(pageResult.getTotal(), List.of());
+        }
+
+        // 2. 批量查 SKU 算最低价:一次 IN 查询,而不是循环查库(N+1 问题)
+        List<Long> spuIds = spus.stream().map(Spu::getId).collect(Collectors.toList());
+        Map<Long, Integer> minPriceMap = new HashMap<>();
+        skuMapper.selectList(
+                new LambdaQueryWrapper<Sku>()
+                        .in(Sku::getSpuId, spuIds)
+                        .eq(Sku::getStatus, 1)
+        ).forEach(sku -> minPriceMap.merge(sku.getSpuId(), sku.getPrice(), Math::min));
+
+        // 3. Entity → VO
+        List<ProductListItemVO> records = spus.stream()
+                .map(s -> new ProductListItemVO(
+                        s.getId(), s.getName(), s.getMainImage(),
+                        s.getSales(), minPriceMap.getOrDefault(s.getId(), 0)))
+                .collect(Collectors.toList());
+        return PageResult.of(pageResult.getTotal(), records);
+    }
+
 }
