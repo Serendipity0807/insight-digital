@@ -52,5 +52,15 @@
             <artifactId>jjwt-jackson</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <!-- 内部模块:复用 JwtUtil(common 只引 spring-web,不带 servlet 容器,WebFlux 兼容) -->
+        <dependency>
+            <groupId>com.insight</groupId>
+            <artifactId>insight-common</artifactId>
+        </dependency>
+        <!-- 条件注解 @ConditionalOnProperty:让共享 Bean 按需注册(每个 Boot 应用本来就带它,不加新东西) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
     </dependencies>
 </project>

@@ -31,6 +31,12 @@
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-loadbalancer</artifactId>
         </dependency>
+        <!-- 内部模块:复用 JwtUtil(common 只引 spring-web,不带 servlet 容器,WebFlux 兼容) -->
+        <dependency>
+            <groupId>com.insight</groupId>
+            <artifactId>insight-common</artifactId>
+        </dependency>
+
     </dependencies>
 
     <build>
