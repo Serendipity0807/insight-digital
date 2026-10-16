@@ -31,6 +31,7 @@
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <jjwt.version>0.12.6</jjwt.version>
     </properties>
 
     <!-- 只"标价"不上菜:子模块引依赖不写版本号,从这继承 -->
@@ -77,6 +78,22 @@
                 <groupId>com.insight</groupId>
                 <artifactId>insight-common</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+            <!-- JWT:签发与解析 token,jjwt 拆成 api/impl/jackson 三件套 -->
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-api</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-impl</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-jackson</artifactId>
+                <version>${jjwt.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

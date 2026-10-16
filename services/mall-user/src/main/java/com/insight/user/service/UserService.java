@@ -3,6 +3,9 @@ package com.insight.user.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.insight.common.exception.BusinessException;
 import com.insight.common.exception.ErrorCode;
+import com.insight.common.util.JwtUtil;
+import com.insight.user.dto.LoginRequest;
+import com.insight.user.dto.LoginVO;
 import com.insight.user.dto.RegisterRequest;
 import com.insight.user.entity.User;
 import com.insight.user.mapper.UserMapper;
@@ -18,6 +21,9 @@ public class UserService {
 
     @Autowired
     private UserMapper userMapper;
+
+    @Autowired
+    private JwtUtil jwtUtil;
 
     /** BCrypt 编码器:线程安全,整个服务用一个实例即可 */
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
@@ -48,5 +54,29 @@ public class UserService {
         }
         log.info("用户注册成功, userId={}", user.getId());
         return user.getId();
+    }
+
+    public LoginVO login(LoginRequest req) {
+        // 1. 按唯一字段查用户(登录查一条,不是查重计数)
+        User user = userMapper.selectOne(
+                new LambdaQueryWrapper<User>().eq(User::getPhone, req.getPhone()));
+
+        // 2. 用户不存在 或 密码不匹配 → 统一一个错误,不泄露"手机号是否已注册"
+        if (user == null || !passwordEncoder.matches(req.getPassword(), user.getPassword())) {
+            throw new BusinessException(ErrorCode.LOGIN_FAILED);
+        }
+
+        // 3. 签 JWT
+        String token = jwtUtil.generate(user.getId());
+
+        // 4. 组装响应
+        LoginVO vo = new LoginVO();
+        vo.setToken(token);
+        vo.setUserId(user.getId());
+        vo.setNickname(user.getNickname());
+        vo.setAvatar(user.getAvatar());
+        vo.setLevel(user.getLevel());
+        log.info("用户登录成功, userId={}", user.getId());
+        return vo;
     }
 }

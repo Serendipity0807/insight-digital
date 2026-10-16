@@ -1,6 +1,8 @@
 package com.insight.user.controller;
 
 import com.insight.common.result.Result;
+import com.insight.user.dto.LoginRequest;
+import com.insight.user.dto.LoginVO;
 import com.insight.user.dto.RegisterRequest;
 import com.insight.user.service.UserService;
 import jakarta.validation.Valid;
@@ -18,6 +20,12 @@ public class UserController {
     @PostMapping("/register")
     public Result<Long> register(@RequestBody @Valid RegisterRequest req) {
         return Result.success(userService.register(req));
+    }
+
+    /** 登录。POST /api/v1/user/login,body = {phone, password} */
+    @PostMapping("/login")
+    public Result<LoginVO> login(@RequestBody @Valid LoginRequest req) {
+        return Result.success(userService.login(req));
     }
 
     /** 健康探活:验证"网关 → Nacos → mall-user"链路是否通 */

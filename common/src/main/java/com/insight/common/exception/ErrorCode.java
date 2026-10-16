@@ -14,7 +14,9 @@ public enum ErrorCode {
 
     PRODUCT_NOT_FOUND(10201, "商品不存在"),
 
-    PHONE_ALREADY_REGISTERED(10301, "该手机号已被注册");
+    PHONE_ALREADY_REGISTERED(10301, "该手机号已注册"),
+    LOGIN_FAILED(10302, "手机号或密码错误");
+
 
     private final int code;
     private final String message;
