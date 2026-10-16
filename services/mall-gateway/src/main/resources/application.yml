@@ -1,0 +1,16 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: mall-gateway
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+    gateway:
+      routes:
+        - id: mall-product             # 路由唯一 id,语义化命名
+          uri: lb://mall-product       # 按服务名从 Nacos 找实例,负载均衡
+          predicates:
+            - Path=/api/v1/product/**  # 命中此路径 → 原样转发给 mall-product

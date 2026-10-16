@@ -16,6 +16,7 @@
     <modules>
         <module>common</module>
         <module>services/mall-product</module>
+        <module>services/mall-gateway</module>
     </modules>
 
 
