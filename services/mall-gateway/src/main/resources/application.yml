@@ -17,4 +17,4 @@ spring:
         - id: mall-user
           uri: lb://mall-user
           predicates:
-            - Path=/api/v1/product/**
+            - Path=/api/v1/user/**

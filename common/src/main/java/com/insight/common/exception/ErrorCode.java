@@ -12,7 +12,9 @@ public enum ErrorCode {
     INTERNAL_ERROR(10000, "系统繁忙,请稍后再试"),
     PARAM_ERROR(10001, "参数错误"),
 
-    PRODUCT_NOT_FOUND(10201, "商品不存在");
+    PRODUCT_NOT_FOUND(10201, "商品不存在"),
+
+    PHONE_ALREADY_REGISTERED(10301, "该手机号已被注册");
 
     private final int code;
     private final String message;

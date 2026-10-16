@@ -3,6 +3,7 @@ package com.insight.common.exception;
 import com.insight.common.result.Result;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -36,5 +37,15 @@ public class GlobalExceptionHandler {
         log.error("系统异常", e);
         return Result.error(ErrorCode.INTERNAL_ERROR.getCode(),
                 ErrorCode.INTERNAL_ERROR.getMessage());
+    }
+
+    /** 请求体参数校验失败(@RequestBody @Valid)→ 参数错误 */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public Result<Void> handleBodyValid(MethodArgumentNotValidException e) {
+        String msg = e.getBindingResult().getFieldErrors().stream()
+                .findFirst()
+                .map(f -> f.getDefaultMessage())
+                .orElse(ErrorCode.PARAM_ERROR.getMessage());
+        return Result.error(ErrorCode.PARAM_ERROR.getCode(), msg);
     }
 }
