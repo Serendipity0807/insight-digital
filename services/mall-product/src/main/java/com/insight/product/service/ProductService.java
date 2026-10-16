@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.insight.common.exception.BusinessException;
 import com.insight.common.exception.ErrorCode;
 import com.insight.product.dto.ProductDetailVO;
+import com.insight.product.dto.SkuVO;
 import com.insight.product.entity.Sku;
 import com.insight.product.entity.Spu;
 import com.insight.product.mapper.SkuMapper;
@@ -86,6 +87,35 @@ public class ProductService {
                         s.getTag(), s.getTagline()))
                 .collect(Collectors.toList());
         return PageResult.of(pageResult.getTotal(), records);
+    }
+
+    /** 批量查 SKU 摘要:供内部服务(购物车)组装展示用,两次 IN 查询避免 N+1 */
+    public List<SkuVO> listSkuByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        // 1. 一次查回所有 SKU(逻辑删除的自动被 @TableLogic 过滤)
+        List<Sku> skus = skuMapper.selectBatchIds(ids);
+        if (skus.isEmpty()) {
+            return List.of();
+        }
+        // 2. 批量查 SPU 拿商品名——和分页列表算最低价一个手法,绝不循环查库
+        Map<Long, String> spuNameMap = spuMapper.selectBatchIds(
+                        skus.stream().map(Sku::getSpuId).distinct().toList())
+                .stream()
+                .collect(Collectors.toMap(Spu::getId, Spu::getName));
+        // 3. 组装
+        return skus.stream().map(s -> {
+            SkuVO vo = new SkuVO();
+            vo.setId(s.getId());
+            vo.setSpuId(s.getSpuId());
+            vo.setSpec(s.getSpec());
+            vo.setPrice(s.getPrice());
+            vo.setOriginalPrice(s.getOriginalPrice());
+            vo.setImage(s.getImage());
+            vo.setSpuName(spuNameMap.getOrDefault(s.getSpuId(), ""));
+            return vo;
+        }).toList();
     }
 
 }
