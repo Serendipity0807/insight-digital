@@ -14,3 +14,7 @@ spring:
           uri: lb://mall-product       # 按服务名从 Nacos 找实例,负载均衡
           predicates:
             - Path=/api/v1/product/**  # 命中此路径 → 原样转发给 mall-product
+        - id: mall-user
+          uri: lb://mall-user
+          predicates:
+            - Path=/api/v1/product/**
