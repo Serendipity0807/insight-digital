@@ -3,8 +3,8 @@ package com.insight.common.exception;
 import lombok.Getter;
 
 /**
- * 统一错误码:
- * 100xx 通用;102xx 商品;其余服务按分段表继续追加。
+ * 统一错误码分段表:
+ * 100xx 通用;102xx 商品;103xx 用户;104xx 购物车;105xx 订单;106xx 库存;107xx 支付。
  */
 @Getter
 public enum ErrorCode {
@@ -15,7 +15,10 @@ public enum ErrorCode {
     PRODUCT_NOT_FOUND(10201, "商品不存在"),
 
     PHONE_ALREADY_REGISTERED(10301, "该手机号已注册"),
-    LOGIN_FAILED(10302, "手机号或密码错误");
+
+    LOGIN_FAILED(10302, "手机号或密码错误"),
+
+    CART_ITEM_NOT_FOUND(10401, "购物车条目不存在");
 
 
     private final int code;

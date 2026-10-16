@@ -18,5 +18,22 @@ spring:
           uri: lb://mall-user
           predicates:
             - Path=/api/v1/user/**
+        - id: mall-cart
+          uri: lb://mall-cart
+          predicates:
+            - Path=/api/v1/cart/**
+        - id: mall-order
+          uri: lb://mall-order
+          predicates:
+            - Path=/api/v1/order/**
+        - id: mall-inventory
+          uri: lb://mall-inventory
+          predicates:
+            - Path=/api/v1/inventory/**
+        - id: mall-payment
+          uri: lb://mall-payment
+          predicates:
+            - Path=/api/v1/payment/**
+
 jwt:
   secret: insight-digital-jwt-secret-key-please-change-me-2026   # 必须与 mall-user 完全一致,否则验签全挂

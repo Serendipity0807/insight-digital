@@ -18,6 +18,10 @@
         <module>services/mall-product</module>
         <module>services/mall-gateway</module>
         <module>services/mall-user</module>
+        <module>services/mall-cart</module>
+        <module>services/mall-order</module>
+        <module>services/mall-inventory</module>
+        <module>services/mall-payment</module>
     </modules>
 
 

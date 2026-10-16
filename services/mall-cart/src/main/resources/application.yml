@@ -1,0 +1,15 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: mall-cart
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 2   # 按服务分逻辑库:购物车用 db2(设计文档第 9 节)
