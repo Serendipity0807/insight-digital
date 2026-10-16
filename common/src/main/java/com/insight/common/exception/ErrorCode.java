@@ -18,7 +18,13 @@ public enum ErrorCode {
 
     LOGIN_FAILED(10302, "手机号或密码错误"),
 
-    CART_ITEM_NOT_FOUND(10401, "购物车条目不存在");
+    CART_ITEM_NOT_FOUND(10401, "购物车条目不存在"),
+
+    ORDER_ITEM_INVALID(10501, "商品不存在或已下架"),
+
+    STOCK_NOT_ENOUGH(10601, "库存不足"),
+    STOCK_LOCK_CONFLICT(10602, "下单太火爆,请稍后再试");
+
 
 
     private final int code;

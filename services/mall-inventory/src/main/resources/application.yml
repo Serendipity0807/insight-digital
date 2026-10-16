@@ -8,3 +8,8 @@ spring:
     nacos:
       discovery:
         server-addr: localhost:8848
+  datasource:
+    url: jdbc:mysql://localhost:3306/mall_inventory?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: 1234
+    driver-class-name: com.mysql.cj.jdbc.Driver
