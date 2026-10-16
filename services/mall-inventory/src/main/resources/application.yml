@@ -1,5 +1,5 @@
 server:
-  port: 8086
+  port: 8085
 
 spring:
   application:
@@ -13,3 +13,11 @@ spring:
     username: root
     password: 1234
     driver-class-name: com.mysql.cj.jdbc.Driver
+
+seata:
+  tx-service-group: insight-tx-group
+  service:
+    vgroup-mapping:
+      insight-tx-group: default
+    grouplist:
+      default: 127.0.0.1:8091

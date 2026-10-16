@@ -13,7 +13,7 @@
 
     <artifactId>mall-payment</artifactId>
     <name>mall-payment</name>
-    <description>订单服务:纯 Redis 存储(阶段⑤)</description>
+    <description>支付服务</description>
 
     <dependencies>
         <!-- web -->

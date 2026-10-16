@@ -18,6 +18,7 @@ import com.insight.order.mapper.OrderItemMapper;
 import com.insight.order.mapper.OrderLogMapper;
 import com.insight.order.mapper.OrderMapper;
 import lombok.extern.slf4j.Slf4j;
+import io.seata.spring.annotation.GlobalTransactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -62,13 +63,10 @@ public class OrderService {
     private TransactionTemplate transactionTemplate;
 
     /**
-     * 创建订单(编排方法,本身不开事务):
-     *   1) 拉商品服务权威数据 → 快照 + 服务端算钱
-     *   2) 落订单(独立事务,提交)
-     *   3) Feign 锁库存——本地事务管不到这一步
-     * 锁库存失败时订单已提交 → "订单在、库存没锁"的分布式不一致。
-     * 本步故意不补偿;第⑥步 Seata 全局事务会把整条链一起回滚。
+     * 全局事务入口(TM)。锁库存失败 → 异常传播 → TC 全局回滚 → 订单分支被 undo。
+     * 第⑤步留的脏订单,被这一行注解消灭。
      */
+    @GlobalTransactional
     public OrderVO create(Long userId, CreateOrderRequest req) {
         // 1. 拉权威商品数据 + 校验(不存在的 SKU → 10501)
         Map<Long, ProductSkuVO> skuMap = loadAndCheckSkus(req);

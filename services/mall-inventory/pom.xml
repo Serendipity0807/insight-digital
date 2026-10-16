@@ -13,7 +13,7 @@
 
     <artifactId>mall-inventory</artifactId>
     <name>mall-inventory</name>
-    <description>库存服务:纯 Redis 存储(阶段⑤)</description>
+    <description>库存服务</description>
 
     <dependencies>
         <!-- web -->
@@ -44,7 +44,11 @@
             <artifactId>mysql-connector-j</artifactId>
             <scope>runtime</scope>
         </dependency>
-
+        <!-- Seata 分布式事务:版本由父 POM 的 spring-cloud-alibaba-dependencies 统一管理 -->
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-seata</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

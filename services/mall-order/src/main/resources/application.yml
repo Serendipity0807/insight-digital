@@ -8,3 +8,16 @@ spring:
     nacos:
       discovery:
         server-addr: localhost:8848
+  datasource:
+    url: jdbc:mysql://localhost:3306/mall_order?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: 1234
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+seata:
+  tx-service-group: insight-tx-group
+  service:
+    vgroup-mapping:
+      insight-tx-group: default
+    grouplist:
+      default: 127.0.0.1:8091
