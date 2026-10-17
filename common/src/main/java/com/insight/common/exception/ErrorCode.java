@@ -10,6 +10,7 @@ import lombok.Getter;
 public enum ErrorCode {
 
     INTERNAL_ERROR(10000, "系统繁忙,请稍后再试"),
+
     PARAM_ERROR(10001, "参数错误"),
 
     PRODUCT_NOT_FOUND(10201, "商品不存在"),
@@ -22,9 +23,17 @@ public enum ErrorCode {
 
     ORDER_ITEM_INVALID(10501, "商品不存在或已下架"),
 
-    STOCK_NOT_ENOUGH(10601, "库存不足"),
-    STOCK_LOCK_CONFLICT(10602, "下单太火爆,请稍后再试");
+    ORDER_STATUS_INVALID(10502, "订单状态异常,请刷新重试"),
 
+    STOCK_NOT_ENOUGH(10601, "库存不足"),
+
+    STOCK_LOCK_CONFLICT(10602, "下单太火爆,请稍后再试"),
+
+    STOCK_DEDUCT_CONFLICT(10603, "库存扣减冲突,请稍后再试"),
+
+    ORDER_NOT_PAYABLE(10701, "订单不存在或不可支付"),
+
+    PAYMENT_NOT_FOUND(10702, "支付单不存在");
 
 
     private final int code;

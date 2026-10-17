@@ -11,4 +11,8 @@ public interface InventoryClient {
 
     @PostMapping("/api/v1/inventory/lock")
     Result<Void> lock(@RequestBody LockRequest request);
+
+    /** 支付成功扣减锁定库存(内部接口) */
+    @PostMapping("/internal/inventory/deduct")
+    Result<Void> deduct(@RequestBody DeductRequest request);
 }

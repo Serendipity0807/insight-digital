@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.insight.common.exception.BusinessException;
 import com.insight.common.exception.ErrorCode;
+import com.insight.inventory.dto.DeductRequest;
 import com.insight.inventory.dto.LockRequest;
 import com.insight.inventory.entity.Inventory;
 import com.insight.inventory.entity.InventoryLog;
@@ -22,6 +23,8 @@ public class InventoryService {
     private static final int MAX_RETRY = 3;
     /** 流水类型:1 下单锁定 */
     private static final int CHANGE_TYPE_LOCK = 1;
+    /** 流水类型:2 支付扣减 */
+    private static final int CHANGE_TYPE_DEDUCT = 2;
 
     @Autowired
     private InventoryMapper inventoryMapper;
@@ -71,5 +74,40 @@ public class InventoryService {
             log.warn("库存锁定版本冲突, skuId={}, 第 {} 次重试", skuId, attempt);
         }
         throw new BusinessException(ErrorCode.STOCK_LOCK_CONFLICT);
+    }
+
+    /** 支付扣减:locked 减。乐观锁 CAS + 重试,和锁定一个套路 */
+    @Transactional
+    public void deduct(DeductRequest req) {
+        for (DeductRequest.Item item : req.getItems()) {
+            deductOne(req.getOrderId(), item.getSkuId(), item.getQuantity());
+        }
+    }
+
+    private void deductOne(Long orderId, Long skuId, Integer quantity) {
+        for (int attempt = 1; attempt <= MAX_RETRY; attempt++) {
+            Inventory inv = inventoryMapper.selectOne(
+                    new LambdaQueryWrapper<Inventory>().eq(Inventory::getSkuId, skuId));
+            if (inv == null || inv.getLockedStock() < quantity) {
+                throw new BusinessException(ErrorCode.STOCK_DEDUCT_CONFLICT);
+            }
+            int rows = inventoryMapper.update(null,
+                    new LambdaUpdateWrapper<Inventory>()
+                            .set(Inventory::getLockedStock, inv.getLockedStock() - quantity)
+                            .set(Inventory::getVersion, inv.getVersion() + 1)
+                            .eq(Inventory::getSkuId, skuId)
+                            .eq(Inventory::getVersion, inv.getVersion()));
+            if (rows == 1) {
+                InventoryLog logRow = new InventoryLog();
+                logRow.setSkuId(skuId);
+                logRow.setChangeType(CHANGE_TYPE_DEDUCT);
+                logRow.setQuantity(-quantity);   // 锁定库存减少,记负数
+                logRow.setOrderId(orderId);
+                inventoryLogMapper.insert(logRow);
+                return;
+            }
+            log.warn("库存扣减版本冲突, skuId={}, 第 {} 次重试", skuId, attempt);
+        }
+        throw new BusinessException(ErrorCode.STOCK_DEDUCT_CONFLICT);
     }
 }

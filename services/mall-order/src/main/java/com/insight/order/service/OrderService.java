@@ -1,15 +1,15 @@
 package com.insight.order.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.insight.common.exception.BusinessException;
 import com.insight.common.exception.ErrorCode;
 import com.insight.common.result.Result;
-import com.insight.order.client.InventoryClient;
-import com.insight.order.client.LockRequest;
-import com.insight.order.client.ProductClient;
-import com.insight.order.client.ProductSkuVO;
+import com.insight.order.client.*;
 import com.insight.order.dto.CreateOrderRequest;
+import com.insight.order.dto.InternalOrderVO;
 import com.insight.order.dto.OrderVO;
 import com.insight.order.entity.Order;
 import com.insight.order.entity.OrderItem;
@@ -21,6 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 import io.seata.spring.annotation.GlobalTransactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
@@ -35,6 +36,8 @@ public class OrderService {
 
     /** 状态机:10 待支付 */
     private static final int STATUS_PENDING = 10;
+    /** 状态机:20 已支付 */
+    private static final int STATUS_PAID = 20;
     /** 支付时限(分钟) */
     private static final int PAY_EXPIRE_MINUTES = 30;
     /** 状态日志触发方 */
@@ -179,6 +182,67 @@ public class OrderService {
             return obj == null ? null : objectMapper.writeValueAsString(obj);
         } catch (JsonProcessingException e) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
+        }
+    }
+
+    /** 内部接口:支付服务发起支付前查订单(逻辑删除由 @TableLogic 自动过滤) */
+    public InternalOrderVO getForPayment(Long orderId) {
+        Order order = orderMapper.selectById(orderId);
+        if (order == null) {
+            return null;
+        }
+        InternalOrderVO vo = new InternalOrderVO();
+        vo.setOrderId(order.getId());
+        vo.setUserId(order.getUserId());
+        vo.setStatus(order.getStatus());
+        vo.setPayAmount(order.getPayAmount());
+        return vo;
+    }
+
+    /**
+     * 内部接口:支付成功 → 订单 10→20(条件更新,幂等)+ 扣减锁定库存(Feign 子分支)。
+     * 声明式 @Transactional 即可:被 controller 直调,没有 self-invocation 问题。
+     */
+    @Transactional
+    public void markPaid(Long orderId) {
+        // 1. 状态机闸门:10→20 条件更新。0 行 = 状态不对(重复回调/已关单)
+        int rows = orderMapper.update(null,
+                new LambdaUpdateWrapper<Order>()
+                        .set(Order::getStatus, STATUS_PAID)
+                        .set(Order::getPaymentTime, LocalDateTime.now())
+                        .eq(Order::getId, orderId)
+                        .eq(Order::getStatus, STATUS_PENDING));
+        if (rows == 0) {
+            Order cur = orderMapper.selectById(orderId);
+            if (cur != null && cur.getStatus() == STATUS_PAID) {
+                return;   // 重复回调:已是已支付,幂等成功,不再扣库存
+            }
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID);
+        }
+
+        // 2. 状态日志(只追加)
+        OrderLog logRow = new OrderLog();
+        logRow.setOrderId(orderId);
+        logRow.setFromStatus(STATUS_PENDING);
+        logRow.setToStatus(STATUS_PAID);
+        logRow.setOperator(OPERATOR_SYSTEM);
+        logRow.setRemark("支付成功");
+        orderLogMapper.insert(logRow);
+
+        // 3. 扣减锁定库存(Feign 子分支):支付成功,locked 减——saleable 在锁定时已扣过
+        List<OrderItem> items = orderItemMapper.selectList(
+                new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, orderId));
+        DeductRequest req = new DeductRequest();
+        req.setOrderId(orderId);
+        req.setItems(items.stream().map(i -> {
+            DeductRequest.Item di = new DeductRequest.Item();
+            di.setSkuId(i.getSkuId());
+            di.setQuantity(i.getQuantity());
+            return di;
+        }).toList());
+        Result<Void> resp = inventoryClient.deduct(req);
+        if (resp.getCode() != Result.SUCCESS_CODE) {
+            throw new BusinessException(resp.getCode(), resp.getMessage());
         }
     }
 }
