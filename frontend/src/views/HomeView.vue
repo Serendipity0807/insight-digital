@@ -1,19 +1,28 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import ProductCard from '../components/product/ProductCard.vue'
 import CompareBar from '../components/product/CompareBar.vue'
 import { getProductPage } from '../api/product'
+
+const route = useRoute()
+const router = useRouter()
 
 // 首页精选:从后端分页接口拿真数据(替代原来的 mock)
 const products = ref([])
 const loading = ref(true)
 const error = ref('')
 
+// 搜索关键字:来自导航栏搜索框(回车后跳首页带 ?kw=xx)。
+// 前端只负责透传给 /page 接口;后端目前还没接 kw 参数,补丁打好前搜不出结果。
+const kw = computed(() => (route.query.kw || '').trim())
+
 const loadProducts = async () => {
   loading.value = true
   error.value = ''
   try {
-    const data = await getProductPage({ page: 1, size: 12 })
+    // undefined 的 kw axios 会自动忽略,不带在 URL 上
+    const data = await getProductPage({ page: 1, size: 12, kw: kw.value || undefined })
     products.value = data.records
   } catch (e) {
     error.value = e.message || '加载失败'
@@ -24,9 +33,18 @@ const loadProducts = async () => {
 
 onMounted(loadProducts)
 
+// 关键字变化(从别的页面回车搜索 / 清空搜索)重新拉列表,并滚到商品区
+watch(kw, async () => {
+  await loadProducts()
+  document.getElementById('featured')?.scrollIntoView({ behavior: 'smooth' })
+})
+
 const scrollToFeatured = () => {
   document.getElementById('featured')?.scrollIntoView({ behavior: 'smooth' })
 }
+
+// 搜索结果为空时,"返回全部商品"= 去掉 kw 重新导航
+const clearSearch = () => router.push({ path: '/' })
 </script>
 
 <template>
@@ -132,10 +150,9 @@ const scrollToFeatured = () => {
     <section id="featured" class="featured container">
       <header class="section-head">
         <div>
-          <h2>慧眼精选</h2>
-          <p>像翻阅画册一样,发现值得入手的数码好物</p>
+          <h2>{{ kw ? `「${kw}」的搜索结果` : '慧眼精选' }}</h2>
+          <p>{{ kw ? '以下商品与关键字匹配' : '像翻阅画册一样,发现值得入手的数码好物' }}</p>
         </div>
-        <a class="btn-ghost glass" href="#">查看全部</a>
       </header>
 
       <!-- 加载态:骨架屏(占位块,不转圈) -->
@@ -151,7 +168,8 @@ const scrollToFeatured = () => {
 
       <!-- 空态 -->
       <div v-else-if="!products.length" class="state">
-        <p>暂无在售商品</p>
+        <p>{{ kw ? `没有找到与「${kw}」相关的商品` : '暂无在售商品' }}</p>
+        <button v-if="kw" class="btn-ghost glass" @click="clearSearch">返回全部商品</button>
       </div>
 
       <!-- 数据 -->

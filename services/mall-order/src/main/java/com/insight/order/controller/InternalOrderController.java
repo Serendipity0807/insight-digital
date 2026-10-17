@@ -20,7 +20,7 @@ public class InternalOrderController {
 
     /** 支付服务发起支付前查订单 */
     @GetMapping("/{orderId}")
-    public Result<InternalOrderVO> getOrder(@PathVariable Long orderId) {
+    public Result<InternalOrderVO> getOrder(@PathVariable("orderId") Long orderId) {
         return Result.success(orderService.getForPayment(orderId));
     }
 

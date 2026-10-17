@@ -1,5 +1,6 @@
 package com.insight.product.service;
 
+import com.alibaba.nacos.common.utils.StringUtils;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.insight.common.exception.BusinessException;
 import com.insight.common.exception.ErrorCode;
@@ -56,13 +57,14 @@ public class ProductService {
     }
 
     /** 分页查询商品列表(默认按销量倒序,只查在售) */
-    public PageResult<ProductListItemVO> page(int page, int size) {
-        log.info("分页查询商品列表, page={}, size={}", page, size);
+    public PageResult<ProductListItemVO> page(int page, int size, String kw) {
+        log.info("分页查询商品列表, page={}, size={}, kw={}", page, size, kw);
         // 1. 分页查 SPU:new Page<>(当前页, 每页条数),页码从 1 开始
         Page<Spu> pageResult = spuMapper.selectPage(
                 new Page<>(page, size),
                 new LambdaQueryWrapper<Spu>()
                         .eq(Spu::getStatus, 1)        // 只查在售
+                        .like(StringUtils.hasText(kw), Spu::getName, kw)  // kw 非空才生效
                         .orderByDesc(Spu::getSales)   // 排序规则暂用销量倒序占位
         );
         List<Spu> spus = pageResult.getRecords();
@@ -73,18 +75,26 @@ public class ProductService {
         // 2. 批量查 SKU 算最低价:一次 IN 查询,而不是循环查库(N+1 问题)
         List<Long> spuIds = spus.stream().map(Spu::getId).collect(Collectors.toList());
         Map<Long, Integer> minPriceMap = new HashMap<>();
+        Map<Long, Long> minSkuIdMap = new HashMap<>();   // 新增:记住最低价是哪个 SKU
         skuMapper.selectList(
                 new LambdaQueryWrapper<Sku>()
                         .in(Sku::getSpuId, spuIds)
                         .eq(Sku::getStatus, 1)
-        ).forEach(sku -> minPriceMap.merge(sku.getSpuId(), sku.getPrice(), Math::min));
+        ).forEach(sku -> {
+            Integer old = minPriceMap.get(sku.getSpuId());
+            if (old == null || sku.getPrice() < old) {   // 更便宜 → 刷新最低价并记下它的 id
+                minPriceMap.put(sku.getSpuId(), sku.getPrice());
+                minSkuIdMap.put(sku.getSpuId(), sku.getId());
+            }
+        });
 
         // 3. Entity → VO
         List<ProductListItemVO> records = spus.stream()
                 .map(s -> new ProductListItemVO(
                         s.getId(), s.getName(), s.getMainImage(),
                         s.getSales(), minPriceMap.getOrDefault(s.getId(), 0),
-                        s.getTag(), s.getTagline()))
+                        s.getTag(), s.getTagline(),
+                        minSkuIdMap.get(s.getId())))
                 .collect(Collectors.toList());
         return PageResult.of(pageResult.getTotal(), records);
     }

@@ -1,10 +1,15 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { getProductDetail } from '../api/product'
+import { useUserStore } from '../stores/user'
+import { useCartStore } from '../stores/cart'
 import { formatPrice } from '../utils/format'
 
 const route = useRoute()
+const router = useRouter()
+const userStore = useUserStore()
+const cartStore = useCartStore()
 
 const detail = ref(null)
 const loading = ref(true)
@@ -50,12 +55,48 @@ const meterParams = computed(() => params.value.filter((p) => p.type === 'meter'
 // 进度条百分比:value / max,夹在 0~100 之间,防脏数据溢出
 const meterPct = (p) => Math.min(100, Math.round(((p.value || 0) / (p.max || 100)) * 100))
 
-// 第 4 步:接入购物车 / 下单流程
-const addToCart = () => {}
-const buyNow = () => {}
+// —— 加购 / 立即购买 ——
+const adding = ref(false)
+const toast = ref('')
+let toastTimer = null
+
+function showToast(text) {
+  toast.value = text
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => (toast.value = ''), 2200)
+}
+
+/** 加购:未登录先去登录页(带 redirect,登录成功后跳回本商品) */
+async function addToCart() {
+  if (!selectedSkuId.value) return
+  if (!userStore.isLoggedIn) {
+    router.push({ path: '/login', query: { redirect: route.fullPath } })
+    return
+  }
+  adding.value = true
+  try {
+    await cartStore.add(selectedSkuId.value, 1)
+    showToast('已加入购物车')
+  } catch (e) {
+    showToast(e.message || '加购失败')
+  } finally {
+    adding.value = false
+  }
+}
+
+/** 立即购买 = 加购 + 直达购物车结算 */
+async function buyNow() {
+  await addToCart()
+  if (userStore.isLoggedIn) router.push('/cart')
+}
 </script>
 
 <template>
+  <!-- 加购轻提示 -->
+  <Transition name="toast">
+    <div v-if="toast" class="toast">{{ toast }}</div>
+  </Transition>
+
   <div class="container detail">
     <!-- 骨架屏 -->
     <div v-if="loading" class="detail-skeleton">
@@ -124,8 +165,8 @@ const buyNow = () => {}
 
           <!-- CTA -->
           <div class="cta">
-            <button class="btn-primary" @click="buyNow">立即购买</button>
-            <button class="btn-ghost glass" @click="addToCart">加入购物车</button>
+            <button class="btn-primary" :disabled="adding" @click="buyNow">立即购买</button>
+            <button class="btn-ghost glass" :disabled="adding" @click="addToCart">加入购物车</button>
           </div>
 
           <!-- 信任徽章 -->
@@ -393,6 +434,35 @@ const buyNow = () => {}
   border-radius: var(--r-pill);
   background: var(--c-gradient);
   transition: width var(--t-slow) var(--ease-out);
+}
+
+/* —— 加购轻提示 —— */
+.toast {
+  position: fixed;
+  top: calc(var(--header-h) + var(--s-4));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  padding: 12px 24px;
+  font-size: 14px;
+  color: #fff;
+  background: rgba(18, 22, 29, 0.92);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--r-pill);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: var(--glow-card);
+}
+.toast-enter-active,
+.toast-leave-active {
+  transition:
+    opacity var(--t-base) var(--ease-out),
+    transform var(--t-base) var(--ease-out);
+}
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translate(-50%, -8px);
 }
 
 @media (max-width: 900px) {

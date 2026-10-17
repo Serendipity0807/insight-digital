@@ -1,7 +1,36 @@
 <script setup>
-// 顶部导航:固定 + 毛玻璃。
-// 购物车角标数量:第 4 步接入 Pinia 后从 store 读,现在写死 0。
-// 搜索框:第 2 步开放(接商品搜索接口)。
+import { ref, watch, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useUserStore } from '../../stores/user'
+import { useCartStore } from '../../stores/cart'
+
+const router = useRouter()
+// 登录态 + 购物车角标:都从 store 读,全站唯一
+const userStore = useUserStore()
+const cartStore = useCartStore()
+
+// 搜索:回车后跳首页带 ?kw=,由首页按关键字重新拉列表
+const searchKw = ref('')
+function doSearch() {
+  const kw = searchKw.value.trim()
+  router.push({ path: '/', query: kw ? { kw } : {} })
+}
+
+// 登录成功 → 拉一次购物车,角标立即有数
+watch(
+  () => userStore.isLoggedIn,
+  (on) => {
+    if (on) cartStore.load()
+  }
+)
+onMounted(() => {
+  if (userStore.isLoggedIn) cartStore.load()
+})
+
+function handleLogout() {
+  userStore.logout()
+  cartStore.clear()
+}
 </script>
 
 <template>
@@ -21,21 +50,28 @@
 
       <nav class="nav">
         <RouterLink to="/" class="nav-link">首页</RouterLink>
-        <a class="nav-link" href="#featured">全部商品</a>
-        <span class="nav-link soon" title="第 3 步上线">
-          慧眼对比<em class="soon-tag">即将上线</em>
-        </span>
+        <RouterLink :to="{ path: '/', hash: '#featured' }" class="nav-link">全部商品</RouterLink>
+        <RouterLink to="/compare" class="nav-link">慧眼对比</RouterLink>
       </nav>
 
       <div class="actions">
         <label class="search">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
-          <input type="text" placeholder="搜索商品、品牌…" title="第 2 步开放" />
+          <input v-model.trim="searchKw" type="text" placeholder="搜索商品,回车" @keyup.enter="doSearch" />
         </label>
-        <button class="cart-btn" title="购物车(第 4 步开放)">
+        <RouterLink to="/cart" class="cart-btn" title="购物车">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" /></svg>
-          <span class="badge">0</span>
-        </button>
+          <span v-if="cartStore.count" class="badge">{{ cartStore.count }}</span>
+        </RouterLink>
+
+        <!-- 用户区:登录前给入口,登录后给昵称 + 退出 -->
+        <div class="user-area">
+          <template v-if="userStore.isLoggedIn">
+            <span class="nickname">{{ userStore.nickname || '用户' }}</span>
+            <button class="logout-btn" @click="handleLogout">退出</button>
+          </template>
+          <RouterLink v-else to="/login" class="login-link">登录</RouterLink>
+        </div>
       </div>
     </div>
   </header>
@@ -77,22 +113,8 @@
 }
 .nav-link:hover { color: var(--c-text); }
 .router-link-active { color: var(--c-text); }
-.soon {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s-2);
-  cursor: not-allowed;
-}
-.soon-tag {
-  font-style: normal;
-  font-size: 10px;
-  color: var(--c-accent-2);
-  border: 1px solid rgba(33, 212, 196, 0.4);
-  border-radius: var(--r-pill);
-  padding: 1px 8px;
-}
 
-/* —— 右侧:搜索 / 购物车 —— */
+/* —— 右侧:搜索 / 购物车 / 用户 —— */
 .actions { display: flex; align-items: center; gap: var(--s-3); }
 .search {
   display: flex;
@@ -146,6 +168,34 @@
   border-radius: var(--r-pill);
   box-shadow: var(--glow-accent);
 }
+
+/* —— 用户区 —— */
+.user-area {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding-left: var(--s-2);
+}
+.login-link {
+  font-size: 14px;
+  color: var(--c-text-dim);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-pill);
+  padding: 8px 18px;
+  transition:
+    border-color var(--t-fast) var(--ease-out),
+    color var(--t-fast) var(--ease-out);
+}
+.login-link:hover { border-color: var(--c-accent); color: var(--c-text); }
+.nickname { font-size: 13px; color: var(--c-accent-2); }
+.logout-btn {
+  font-size: 12px;
+  color: var(--c-text-faint);
+  background: transparent;
+  border: none;
+  transition: color var(--t-fast) var(--ease-out);
+}
+.logout-btn:hover { color: var(--c-danger); }
 
 @media (max-width: 860px) {
   .nav { display: none; }

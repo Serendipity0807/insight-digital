@@ -117,4 +117,21 @@
             <scope>provided</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <!-- 编译插件:全局开启 -parameters,字节码保留方法参数名。
+             Spring 6 的 @PathVariable/@RequestParam 不显式写名字时,靠它反射取参数名;
+             子模块全部继承这份配置,一处改、处处生效 -->
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <parameters>true</parameters>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
 </project>

@@ -1,8 +1,10 @@
 <script setup>
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { formatPrice } from '../../utils/format'
 import { useCompareStore } from '../../stores/compare'
+import { useUserStore } from '../../stores/user'
+import { useCartStore } from '../../stores/cart'
 
 const props = defineProps({
   product: { type: Object, required: true }
@@ -10,6 +12,8 @@ const props = defineProps({
 
 const router = useRouter()
 const store = useCompareStore()
+const userStore = useUserStore()
+const cartStore = useCartStore()
 const isCompared = computed(() => store.items.some((x) => x.id === props.product.id))
 
 // 价格:列表接口直接给 minPrice(分);兜底(万一走 mock)从 skus 取最低
@@ -25,8 +29,37 @@ const hue = computed(() => props.product.hue ?? (props.product.id ?? 0) % 360)
 
 const goDetail = () => router.push(`/product/${props.product.id}`)
 
-// 第 4 步接入购物车(Pinia + mall-cart 服务);现在先占位
-const addToCart = () => {}
+/**
+ * 卡片直接加购:加"最低价 SKU"进购物车(加购物车必须有 skuId)。
+ * - 后端列表若还没加 minSkuId 字段 → 进详情页选规格(兜底,不是死按钮)
+ * - 未登录 → 先登录
+ * - 成功后按钮短暂变 ✓,角标同步 +1
+ */
+const addState = ref('') // '' | 'ok' | 'err'
+let addTimer = null
+function flash(state) {
+  addState.value = state
+  clearTimeout(addTimer)
+  addTimer = setTimeout(() => (addState.value = ''), 1500)
+}
+
+async function addToCart() {
+  const skuId = props.product.minSkuId ?? props.product.skuId
+  if (!skuId) {
+    goDetail()
+    return
+  }
+  if (!userStore.isLoggedIn) {
+    router.push({ path: '/login', query: { redirect: router.currentRoute.value.fullPath } })
+    return
+  }
+  try {
+    await cartStore.add(skuId, 1)
+    flash('ok')
+  } catch (e) {
+    flash('err')
+  }
+}
 </script>
 
 <template>
@@ -56,8 +89,14 @@ const addToCart = () => {}
           <span class="price-num num">{{ minPrice }}</span>
           <span class="price-from">起</span>
         </div>
-        <button class="add-btn" @click.stop="addToCart" title="加入购物车(第 4 步开放)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg>
+        <button
+          class="add-btn"
+          :class="{ added: addState === 'ok', failed: addState === 'err' }"
+          :title="addState === 'ok' ? '已加入购物车' : addState === 'err' ? '加购失败,请重试' : '加入购物车'"
+          @click.stop="addToCart"
+        >
+          <svg v-if="addState !== 'ok'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg>
+          <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7" /></svg>
         </button>
       </div>
     </div>
@@ -207,4 +246,6 @@ const addToCart = () => {}
 }
 .card:hover .add-btn { opacity: 1; transform: translateY(0); }
 .add-btn:hover { box-shadow: var(--glow-accent); }
+.add-btn.added { background: var(--c-success); }
+.add-btn.failed { background: var(--c-danger); }
 </style>

@@ -40,8 +40,9 @@ public class ProductController {
             @Min(value = 1, message = "页码必须从1开始") int page,
             @RequestParam(value = "size", defaultValue = "10")
             @Min(value = 1, message = "每页条数至少为1")
-            @Max(value = 100, message = "每页条数不能超过100") int size) {
-        return Result.success(productService.page(page, size));
+            @Max(value = 100, message = "每页条数不能超过100") int size,
+            @RequestParam(value = "kw", required = false) String kw) {
+        return Result.success(productService.page(page, size, kw));
     }
 
     /** 批量查 SKU 摘要。GET /api/v1/product/sku/batch?ids=10041,10042

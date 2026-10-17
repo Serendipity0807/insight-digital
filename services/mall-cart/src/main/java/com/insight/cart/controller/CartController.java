@@ -40,7 +40,7 @@ public class CartController {
     /** 修改数量 */
     @PutMapping("/items/{skuId}")
     public Result<Void> updateQuantity(@RequestHeader("X-User-Id") Long userId,
-                                       @PathVariable @Positive(message = "商品规格必须为正数") Long skuId,
+                                       @PathVariable("skuId") @Positive(message = "商品规格必须为正数") Long skuId,
                                        @RequestBody @Valid UpdateQuantityRequest req) {
         cartService.updateQuantity(userId, skuId, req.getQuantity());
         return Result.success();
@@ -49,7 +49,7 @@ public class CartController {
     /** 勾选/取消勾选 */
     @PutMapping("/items/{skuId}/checked")
     public Result<Void> updateChecked(@RequestHeader("X-User-Id") Long userId,
-                                      @PathVariable @Positive(message = "商品规格必须为正数") Long skuId,
+                                      @PathVariable("skuId") @Positive(message = "商品规格必须为正数") Long skuId,
                                       @RequestBody @Valid UpdateCheckedRequest req) {
         cartService.updateChecked(userId, skuId, req.getChecked());
         return Result.success();
@@ -58,7 +58,7 @@ public class CartController {
     /** 删除条目 */
     @DeleteMapping("/items/{skuId}")
     public Result<Void> remove(@RequestHeader("X-User-Id") Long userId,
-                               @PathVariable @Positive(message = "商品规格必须为正数") Long skuId) {
+                               @PathVariable("skuId") @Positive(message = "商品规格必须为正数") Long skuId) {
         cartService.remove(userId, skuId);
         return Result.success();
     }
