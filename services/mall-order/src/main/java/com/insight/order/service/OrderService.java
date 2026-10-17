@@ -17,6 +17,7 @@ import com.insight.order.entity.OrderLog;
 import com.insight.order.mapper.OrderItemMapper;
 import com.insight.order.mapper.OrderLogMapper;
 import com.insight.order.mapper.OrderMapper;
+import com.insight.order.mq.OrderCloseProducer;
 import lombok.extern.slf4j.Slf4j;
 import io.seata.spring.annotation.GlobalTransactional;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +35,8 @@ import java.util.stream.Collectors;
 @Service
 public class OrderService {
 
+    /** 状态机:0 已取消 */
+    private static final int STATUS_CANCELLED = 0;
     /** 状态机:10 待支付 */
     private static final int STATUS_PENDING = 10;
     /** 状态机:20 已支付 */
@@ -57,6 +60,13 @@ public class OrderService {
 
     @Autowired
     private InventoryClient inventoryClient;
+
+    /** 支付服务的 Feign 客户端(关单时关闭支付单) */
+    @Autowired
+    private PaymentClient paymentClient;
+
+    @Autowired
+    private OrderCloseProducer orderCloseProducer;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -105,7 +115,10 @@ public class OrderService {
             throw new BusinessException(lockResult.getCode(), lockResult.getMessage());
         }
 
-        // 5. 响应
+        // 5. 下单成功:投递延时关单消息(30 分钟未支付自动关单,演示配置为 10 秒)
+        orderCloseProducer.sendCloseMessage(orderId);
+
+        // 6. 响应
         OrderVO vo = new OrderVO();
         vo.setOrderId(orderId);
         vo.setPayAmount(totalAmount);
@@ -243,6 +256,61 @@ public class OrderService {
         Result<Void> resp = inventoryClient.deduct(req);
         if (resp.getCode() != Result.SUCCESS_CODE) {
             throw new BusinessException(resp.getCode(), resp.getMessage());
+        }
+    }
+
+    /**
+     * 超时关单(消息消费者调用,TM=order):
+     * 和 markPaid 抢同一个闸门 WHERE status=10——状态机 CAS 先到先得。
+     * 支付先到 → 这里 0 行 → 幂等放弃(库存已在支付链路扣减,绝不能释放);
+     * 这里先到 → markPaid 0 行 → 支付回调抛 10502,全局回滚。
+     * 消息重复投递同理:第一次已把状态改掉,重复进来 0 行直接返回——状态机让关单天然幂等。
+     */
+    @Transactional
+    @GlobalTransactional
+    public void closeOrder(Long orderId) {
+        // 1. 状态机闸门:10→0。0 行 = 已支付/已取消/重复消息,幂等返回
+        int rows = orderMapper.update(null,
+                new LambdaUpdateWrapper<Order>()
+                        .set(Order::getStatus, STATUS_CANCELLED)
+                        .eq(Order::getId, orderId)
+                        .eq(Order::getStatus, STATUS_PENDING));
+        if (rows == 0) {
+            log.info("关单跳过(订单已不在待支付状态), orderId={}", orderId);
+            return;
+        }
+
+        // 2. 状态日志:只追加,不覆盖
+        OrderLog logRow = new OrderLog();
+        logRow.setOrderId(orderId);
+        logRow.setFromStatus(STATUS_PENDING);
+        logRow.setToStatus(STATUS_CANCELLED);
+        logRow.setOperator(OPERATOR_SYSTEM);
+        logRow.setRemark("超时未支付,自动关单");
+        orderLogMapper.insert(logRow);
+
+        // 3. 释放库存(Feign 子分支):locked 回补 saleable
+        List<OrderItem> items = orderItemMapper.selectList(
+                new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, orderId));
+        ReleaseRequest req = new ReleaseRequest();
+        req.setOrderId(orderId);
+        req.setItems(items.stream().map(i -> {
+            ReleaseRequest.Item ri = new ReleaseRequest.Item();
+            ri.setSkuId(i.getSkuId());
+            ri.setQuantity(i.getQuantity());
+            return ri;
+        }).toList());
+        Result<Void> resp = inventoryClient.release(req);
+        if (resp.getCode() != Result.SUCCESS_CODE) {
+            throw new BusinessException(resp.getCode(), resp.getMessage());
+        }
+
+        // 4. 关闭支付单(Feign 子分支):已支付则支付单保持成功,静默幂等
+        ClosePaymentRequest closeReq = new ClosePaymentRequest();
+        closeReq.setOrderId(orderId);
+        Result<Void> closeResp = paymentClient.close(closeReq);
+        if (closeResp.getCode() != Result.SUCCESS_CODE) {
+            throw new BusinessException(closeResp.getCode(), closeResp.getMessage());
         }
     }
 }

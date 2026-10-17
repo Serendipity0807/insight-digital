@@ -15,4 +15,9 @@ public interface InventoryClient {
     /** 支付成功扣减锁定库存(内部接口) */
     @PostMapping("/internal/inventory/deduct")
     Result<Void> deduct(@RequestBody DeductRequest request);
+
+    /** 关单释放库存:locked 回补 saleable(内部接口) */
+    @PostMapping("/internal/inventory/release")
+    Result<Void> release(@RequestBody ReleaseRequest request);
+
 }

@@ -6,6 +6,7 @@ import com.insight.common.exception.BusinessException;
 import com.insight.common.exception.ErrorCode;
 import com.insight.inventory.dto.DeductRequest;
 import com.insight.inventory.dto.LockRequest;
+import com.insight.inventory.dto.ReleaseRequest;
 import com.insight.inventory.entity.Inventory;
 import com.insight.inventory.entity.InventoryLog;
 import com.insight.inventory.mapper.InventoryLogMapper;
@@ -25,6 +26,8 @@ public class InventoryService {
     private static final int CHANGE_TYPE_LOCK = 1;
     /** 流水类型:2 支付扣减 */
     private static final int CHANGE_TYPE_DEDUCT = 2;
+    /** 流水类型:3 取消释放 */
+    private static final int CHANGE_TYPE_RELEASE = 3;
 
     @Autowired
     private InventoryMapper inventoryMapper;
@@ -109,5 +112,41 @@ public class InventoryService {
             log.warn("库存扣减版本冲突, skuId={}, 第 {} 次重试", skuId, attempt);
         }
         throw new BusinessException(ErrorCode.STOCK_DEDUCT_CONFLICT);
+    }
+
+    /** 取消释放:locked 回补 saleable。和锁定相反,乐观锁 CAS 同款 */
+    @Transactional
+    public void release(ReleaseRequest req) {
+        for (ReleaseRequest.Item item : req.getItems()) {
+            releaseOne(req.getOrderId(), item.getSkuId(), item.getQuantity());
+        }
+    }
+
+    private void releaseOne(Long orderId, Long skuId, Integer quantity) {
+        for (int attempt = 1; attempt <= MAX_RETRY; attempt++) {
+            Inventory inv = inventoryMapper.selectOne(
+                    new LambdaQueryWrapper<Inventory>().eq(Inventory::getSkuId, skuId));
+            if (inv == null || inv.getLockedStock() < quantity) {
+                throw new BusinessException(ErrorCode.STOCK_RELEASE_CONFLICT);
+            }
+            int rows = inventoryMapper.update(null,
+                    new LambdaUpdateWrapper<Inventory>()
+                            .set(Inventory::getLockedStock, inv.getLockedStock() - quantity)
+                            .set(Inventory::getSaleableStock, inv.getSaleableStock() + quantity)
+                            .set(Inventory::getVersion, inv.getVersion() + 1)
+                            .eq(Inventory::getSkuId, skuId)
+                            .eq(Inventory::getVersion, inv.getVersion()));
+            if (rows == 1) {
+                InventoryLog logRow = new InventoryLog();
+                logRow.setSkuId(skuId);
+                logRow.setChangeType(CHANGE_TYPE_RELEASE);
+                logRow.setQuantity(quantity);   // 可售库存回补,记正数——两层库存的最后一环闭环
+                logRow.setOrderId(orderId);
+                inventoryLogMapper.insert(logRow);
+                return;
+            }
+            log.warn("库存释放版本冲突, skuId={}, 第 {} 次重试", skuId, attempt);
+        }
+        throw new BusinessException(ErrorCode.STOCK_RELEASE_CONFLICT);
     }
 }

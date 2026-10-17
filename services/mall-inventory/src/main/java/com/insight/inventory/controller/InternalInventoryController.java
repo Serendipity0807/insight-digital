@@ -2,6 +2,7 @@ package com.insight.inventory.controller;
 
 import com.insight.common.result.Result;
 import com.insight.inventory.dto.DeductRequest;
+import com.insight.inventory.dto.ReleaseRequest;
 import com.insight.inventory.service.InventoryService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +23,12 @@ public class InternalInventoryController {
     @PostMapping("/deduct")
     public Result<Void> deduct(@RequestBody @Valid DeductRequest req) {
         inventoryService.deduct(req);
+        return Result.success();
+    }
+    /** 关单释放库存:由订单服务 Feign 调用 */
+    @PostMapping("/release")
+    public Result<Void> release(@RequestBody @Valid ReleaseRequest req) {
+        inventoryService.release(req);
         return Result.success();
     }
 }

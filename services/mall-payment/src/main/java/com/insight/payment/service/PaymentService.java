@@ -27,6 +27,7 @@ public class PaymentService {
 
     private static final int STATUS_PENDING = 0;
     private static final int STATUS_SUCCESS = 1;
+    private static final int STATUS_FAILED = 2;
     private static final int ORDER_STATUS_PENDING = 10;
     private static final String PAY_NO_PREFIX = "PAY";
 
@@ -119,5 +120,18 @@ public class PaymentService {
         vo.setAmount(p.getAmount());
         vo.setChannel(p.getChannel());
         return vo;
+    }
+
+    /**
+     * 内部接口:关单时关闭支付单(由订单服务调用)。
+     * 条件更新 WHERE status=0(待支付)→ 0 行 = 无支付单/已支付/已关闭,全部静默幂等。
+     * 尤其"已支付":用户钱都付了,关单只是晚一步,支付单必须保持成功。
+     */
+    public void closeByOrderId(Long orderId) {
+        paymentMapper.update(null,
+                new LambdaUpdateWrapper<Payment>()
+                        .set(Payment::getStatus, STATUS_FAILED)
+                        .eq(Payment::getOrderId, orderId)
+                        .eq(Payment::getStatus, STATUS_PENDING));
     }
 }

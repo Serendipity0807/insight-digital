@@ -21,3 +21,8 @@ seata:
       insight-tx-group: default
     grouplist:
       default: 127.0.0.1:8091
+
+rocketmq:
+  name-server: 127.0.0.1:9876
+  # 延时等级(开源版固定 18 级):3 = 10 秒(本机演示),16 = 30 分钟(生产)
+  close-delay-level: 3

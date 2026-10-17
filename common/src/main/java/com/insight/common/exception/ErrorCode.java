@@ -31,6 +31,8 @@ public enum ErrorCode {
 
     STOCK_DEDUCT_CONFLICT(10603, "库存扣减冲突,请稍后再试"),
 
+    STOCK_RELEASE_CONFLICT(10604, "库存释放冲突,请稍后再试"),
+
     ORDER_NOT_PAYABLE(10701, "订单不存在或不可支付"),
 
     PAYMENT_NOT_FOUND(10702, "支付单不存在");
