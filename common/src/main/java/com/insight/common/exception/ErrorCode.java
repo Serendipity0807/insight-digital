@@ -5,7 +5,7 @@ import lombok.Getter;
 /**
  * 统一错误码分段表:
  * 100xx 通用;102xx 商品;103xx 用户;104xx 购物车;105xx 订单;106xx 库存;
- * 107xx 支付;108xx 搜索;109xx 促销(秒杀/优惠券);110xx 权限(预留)。
+ * 107xx 支付;108xx 搜索;109xx 促销(秒杀/优惠券);110xx 通知;111xx 后台管理(预留)。
  */
 @Getter
 public enum ErrorCode {
@@ -40,14 +40,16 @@ public enum ErrorCode {
 
     SEARCH_TIMEOUT(10801, "搜索服务繁忙,请稍后再试"),
 
-    // —— 109xx 促销段:秒杀课新增(蓝图原规划 107xx,与支付实现冲突,已改段并修文档)——
     SECKILL_ENDED(10901, "秒杀已结束"),
 
     SECKILL_NOT_STARTED(10902, "秒杀未开始"),   // ④-2 下单校验用,先占位
 
     SECKILL_ALREADY_WARMED(10903, "该场次已预热,重复预热会重置已扣减库存"),
 
-    SECKILL_ALREADY_ORDERED(10904, "该场次已抢过,每个商品限抢一件");  // ④-2 用,先占位
+    SECKILL_ALREADY_ORDERED(10904, "该场次已抢过,每个商品限抢一件"),  // ④-2 用,先占位
+
+    // —— 110xx 通知段:⑥-6 新增(蓝图原规划 110xx 后台管理,已顺延 111xx)——
+    NOTIFY_MESSAGE_NOT_FOUND(11001, "消息不存在");
 
     private final int code;
     private final String message;

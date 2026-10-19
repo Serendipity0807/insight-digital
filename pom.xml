@@ -23,6 +23,8 @@
         <module>services/mall-inventory</module>
         <module>services/mall-payment</module>
         <module>services/mall-search</module>
+        <module>services/mall-promotion</module>
+        <module>services/mall-notify</module>
     </modules>
 
 
