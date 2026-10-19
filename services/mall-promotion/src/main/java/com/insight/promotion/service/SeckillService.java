@@ -1,14 +1,20 @@
 package com.insight.promotion.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.insight.common.exception.BusinessException;
 import com.insight.common.exception.ErrorCode;
 import com.insight.promotion.dto.SeckillGoodsVO;
+import com.insight.promotion.dto.SeckillOrderResponseVO;
+import com.insight.promotion.dto.SeckillResultVO;
 import com.insight.promotion.dto.SessionVO;
 import com.insight.promotion.entity.SeckillItem;
 import com.insight.promotion.entity.SeckillSession;
 import com.insight.promotion.mapper.SeckillItemMapper;
 import com.insight.promotion.mapper.SeckillSessionMapper;
+import com.insight.promotion.mq.SeckillOrderMessage;
+import com.insight.promotion.mq.SeckillOrderProducer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -16,13 +22,25 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
 
 @Slf4j
 @Service
 public class SeckillService {
 
-    /** 库存 key 模板:seckill:stock:{itemId},值 = 实时剩余库存 */
+    /** 库存 key:seckill:stock:{itemId},值 = 实时剩余库存 */
     private static final String STOCK_KEY_PREFIX = "seckill:stock:";
+
+    /** 抢到标记 key:seckill:user:{itemId},Set 存已抢到的 userId(防重) */
+    private static final String USER_KEY_PREFIX = "seckill:user:";
+
+    /** 结果快照 key:seckill:result:{requestId},JSON = SeckillResultVO */
+    private static final String RESULT_KEY_PREFIX = "seckill:result:";
+
+    /** 结果快照存活 30 分钟:排队+消费早就完成,过期自动清理 */
+    private static final long RESULT_TTL_MINUTES = 30;
 
     @Autowired
     private SeckillSessionMapper sessionMapper;
@@ -32,6 +50,12 @@ public class SeckillService {
 
     @Autowired
     private StringRedisTemplate redisTemplate;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    private SeckillOrderProducer seckillOrderProducer;
 
     /** 场次列表:全部启用场次,按开始时间排(前端按时间算状态,服务端不掺和) */
     public List<SessionVO> listSessions() {
@@ -61,7 +85,7 @@ public class SeckillService {
         List<String> keys = items.stream().map(i -> stockKey(i.getId())).toList();
         List<String> stocks = redisTemplate.opsForValue().multiGet(keys);
 
-        return java.util.stream.IntStream.range(0, items.size())
+        return IntStream.range(0, items.size())
                 .mapToObj(j -> {
                     SeckillItem i = items.get(j);
                     String v = stocks.get(j);
@@ -101,7 +125,88 @@ public class SeckillService {
         return items.size();
     }
 
+    /** 秒杀下单(同步侧):轻校验 → 取号 → 写排队中 → 扔消息。重活全在消费端——这就是削峰。
+     *  userId 来自网关验签后透传的 X-User-Id,身份以网关为准,不信客户端。 */
+    public SeckillOrderResponseVO order(Long sessionId, Long itemId, Long userId) {
+        // 1. 场次校验:存在 + 启用 + 时间窗口
+        SeckillSession session = sessionMapper.selectById(sessionId);
+        if (session == null || session.getStatus() != 1) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR);
+        }
+        LocalDateTime now = LocalDateTime.now();
+        if (now.isBefore(session.getStartTime())) {
+            throw new BusinessException(ErrorCode.SECKILL_NOT_STARTED);
+        }
+        if (now.isAfter(session.getEndTime())) {
+            throw new BusinessException(ErrorCode.SECKILL_ENDED);
+        }
+        // 2. 商品校验:item 必须属于这个场次(防跨场次下单)
+        SeckillItem item = itemMapper.selectById(itemId);
+        if (item == null || !item.getSessionId().equals(sessionId)) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR);
+        }
+        // 3. 第一层防重(快速拒绝):已抢到的人直接拦,不再进 MQ。
+        //    并发窗口内的漏网之鱼由第二层(Lua 原子)、第三层(DB 唯一索引)兜底。
+        Boolean grabbed = redisTemplate.opsForSet()
+                .isMember(userKey(itemId), String.valueOf(userId));
+        if (Boolean.TRUE.equals(grabbed)) {
+            throw new BusinessException(ErrorCode.SECKILL_ALREADY_ORDERED);
+        }
+        // 4. 取号 + 写"排队中"快照(30 分钟过期)
+        String requestId = UUID.randomUUID().toString().replace("-", "");
+        SeckillResultVO snapshot = new SeckillResultVO();
+        snapshot.setUserId(userId);
+        snapshot.setStatus(SeckillResultVO.STATUS_QUEUING);
+        writeResult(requestId, snapshot);
+        // 5. 扔进 MQ:带上价格快照,消费端不再读活动表
+        SeckillOrderMessage msg = new SeckillOrderMessage();
+        msg.setRequestId(requestId);
+        msg.setSessionId(sessionId);
+        msg.setItemId(itemId);
+        msg.setUserId(userId);
+        msg.setSkuId(item.getSkuId());
+        msg.setSeckillPrice(item.getSeckillPrice());
+        seckillOrderProducer.send(msg);
+        return new SeckillOrderResponseVO(requestId, SeckillResultVO.STATUS_QUEUING);
+    }
+
+    /** 轮询结果:只认自己取的号(快照里存了 userId,防拿别人的 requestId 偷看) */
+    public SeckillResultVO result(Long sessionId, String requestId, Long userId) {
+        String json = redisTemplate.opsForValue().get(resultKey(requestId));
+        if (json == null) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR);
+        }
+        try {
+            SeckillResultVO vo = objectMapper.readValue(json, SeckillResultVO.class);
+            if (!vo.getUserId().equals(userId)) {
+                throw new BusinessException(ErrorCode.PARAM_ERROR);
+            }
+            return vo;
+        } catch (JsonProcessingException e) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
+        }
+    }
+
+    /** 写结果快照(下单写排队中,消费端写终态,共用这个方法) */
+    private void writeResult(String requestId, SeckillResultVO snapshot) {
+        try {
+            redisTemplate.opsForValue().set(resultKey(requestId),
+                    objectMapper.writeValueAsString(snapshot),
+                    RESULT_TTL_MINUTES, TimeUnit.MINUTES);
+        } catch (JsonProcessingException e) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
+        }
+    }
+
     private String stockKey(Long itemId) {
         return STOCK_KEY_PREFIX + itemId;
+    }
+
+    private String userKey(Long itemId) {
+        return USER_KEY_PREFIX + itemId;
+    }
+
+    private String resultKey(String requestId) {
+        return RESULT_KEY_PREFIX + requestId;
     }
 }

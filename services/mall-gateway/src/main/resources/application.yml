@@ -38,6 +38,10 @@ spring:
           uri: lb://mall-search
           predicates:
             - Path=/api/v1/search/**
+        - id: mall-promotion          # 新增:秒杀
+          uri: lb://mall-promotion
+          predicates:
+            - Path=/api/v1/promotion/**
 
 jwt:
   secret: insight-digital-jwt-secret-key-please-change-me-2026   # 必须与 mall-user 完全一致,否则验签全挂
