@@ -11,3 +11,6 @@ spring:
 
 elasticsearch:
   url: http://localhost:9200
+
+rocketmq:
+  name-server: 127.0.0.1:9876

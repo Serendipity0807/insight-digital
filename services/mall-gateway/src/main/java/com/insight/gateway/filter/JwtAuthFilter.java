@@ -11,6 +11,7 @@ import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpRequest;
@@ -24,13 +25,18 @@ import java.util.List;
 @Component
 public class JwtAuthFilter implements GlobalFilter, Ordered {
 
-    /** 白名单:登录/注册/探活 + 商品浏览与搜索(公开资源) */
-    private static final List<String> WHITE_LIST = List.of(
-            "/api/v1/user/login",
-            "/api/v1/user/register",
-            "/api/v1/user/ping",
-            "/api/v1/product",
-            "/api/v1/search"
+    /** 白名单规则:HTTP 方法 + 路径前缀 双匹配,只放行"公开的只读操作"。
+     *  写操作(POST/PUT/DELETE)一律不在白名单——哪怕路径前缀相同也要 token。
+     *  例:GET /api/v1/product/1001 放行,PUT /api/v1/product/1001/status 拦截。
+     *  record 是 Java 16+ 的轻量数据类:一行声明字段,自动生成构造器/equals/toString。 */
+    private record WhiteRule(HttpMethod method, String pathPrefix) {}
+
+    private static final List<WhiteRule> WHITE_LIST = List.of(
+            new WhiteRule(HttpMethod.POST, "/api/v1/user/login"),
+            new WhiteRule(HttpMethod.POST, "/api/v1/user/register"),
+            new WhiteRule(HttpMethod.GET,  "/api/v1/user/ping"),
+            new WhiteRule(HttpMethod.GET,  "/api/v1/product"),
+            new WhiteRule(HttpMethod.GET,  "/api/v1/search")
     );
 
     @Autowired
@@ -42,8 +48,9 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String path = exchange.getRequest().getURI().getPath();
+        HttpMethod method = exchange.getRequest().getMethod();
         // 1. 白名单直接放行(前缀匹配必须加 "/",否则 /api/v1/productXxx 会被误放行)
-        if (isWhiteListed(path)) {
+        if (isWhiteListed(method, path)) {
             return chain.filter(exchange);
         }
 
@@ -67,9 +74,13 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
         }
     }
 
-    private boolean isWhiteListed(String path) {
-        for (String white : WHITE_LIST) {
-            if (path.equals(white) || path.startsWith(white + "/")) {
+    /** 方法与路径前缀同时匹配才算白名单命中 */
+    private boolean isWhiteListed(HttpMethod method, String path) {
+        for (WhiteRule rule : WHITE_LIST) {
+            boolean methodMatch = rule.method().equals(method);
+            boolean pathMatch = path.equals(rule.pathPrefix())
+                    || path.startsWith(rule.pathPrefix() + "/");
+            if (methodMatch && pathMatch) {
                 return true;
             }
         }
