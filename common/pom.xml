@@ -52,38 +52,10 @@
             <artifactId>jjwt-jackson</artifactId>
             <scope>runtime</scope>
         </dependency>
-        <!-- 内部模块:复用 JwtUtil(common 只引 spring-web,不带 servlet 容器,WebFlux 兼容) -->
-        <dependency>
-            <groupId>com.insight</groupId>
-            <artifactId>insight-common</artifactId>
-        </dependency>
         <!-- 条件注解 @ConditionalOnProperty:让共享 Bean 按需注册(每个 Boot 应用本来就带它,不加新东西) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-autoconfigure</artifactId>
-        </dependency>
-        <!-- MyBatis-Plus 三件套 + MySQL 驱动(和 user/inventory 一致) -->
-        <dependency>
-            <groupId>com.baomidou</groupId>
-            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.baomidou</groupId>
-            <artifactId>mybatis-plus-jsqlparser</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.mysql</groupId>
-            <artifactId>mysql-connector-j</artifactId>
-            <scope>runtime</scope>
-        </dependency>
-        <!-- Feign 两件套:2023 版 openfeign 不自带负载均衡器,缺 loadbalancer 启动即报错(购物车踩过的坑) -->
-        <dependency>
-            <groupId>org.springframework.cloud</groupId>
-            <artifactId>spring-cloud-starter-openfeign</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.cloud</groupId>
-            <artifactId>spring-cloud-starter-loadbalancer</artifactId>
         </dependency>
     </dependencies>
 </project>

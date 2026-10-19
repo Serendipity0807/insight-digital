@@ -35,7 +35,9 @@ public enum ErrorCode {
 
     ORDER_NOT_PAYABLE(10701, "订单不存在或不可支付"),
 
-    PAYMENT_NOT_FOUND(10702, "支付单不存在");
+    PAYMENT_NOT_FOUND(10702, "支付单不存在"),
+
+    SEARCH_TIMEOUT(10801, "搜索服务繁忙,请稍后再试");
 
 
     private final int code;

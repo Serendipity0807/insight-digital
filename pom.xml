@@ -22,6 +22,7 @@
         <module>services/mall-order</module>
         <module>services/mall-inventory</module>
         <module>services/mall-payment</module>
+        <module>services/mall-search</module>
     </modules>
 
 
@@ -37,6 +38,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <jjwt.version>0.12.6</jjwt.version>
         <rocketmq.version>4.9.7</rocketmq.version>
+        <elasticsearch.version>8.13.4</elasticsearch.version>
     </properties>
 
     <!-- 只"标价"不上菜:子模块引依赖不写版本号,从这继承 -->
@@ -105,6 +107,17 @@
                 <groupId>org.apache.rocketmq</groupId>
                 <artifactId>rocketmq-client</artifactId>
                 <version>${rocketmq.version}</version>
+            </dependency>
+            <!-- ES Java 客户端:两件套缺一不可,版本与服务器严格一致 -->
+            <dependency>
+                <groupId>co.elastic.clients</groupId>
+                <artifactId>elasticsearch-java</artifactId>
+                <version>${elasticsearch.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.elasticsearch.client</groupId>
+                <artifactId>elasticsearch-rest-client</artifactId>
+                <version>${elasticsearch.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

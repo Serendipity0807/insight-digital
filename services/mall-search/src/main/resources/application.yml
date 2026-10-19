@@ -1,0 +1,13 @@
+server:
+  port: 8088
+
+spring:
+  application:
+    name: mall-search          # Nacos 注册名,网关 lb://mall-search 认这个名字
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+
+elasticsearch:
+  url: http://localhost:9200
