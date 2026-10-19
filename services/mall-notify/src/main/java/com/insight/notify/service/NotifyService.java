@@ -10,6 +10,8 @@ import com.insight.common.result.PageResult;
 import com.insight.notify.dto.MessageVO;
 import com.insight.notify.entity.SiteMessage;
 import com.insight.notify.mapper.SiteMessageMapper;
+import com.insight.notify.mq.SmsTaskMessage;
+import com.insight.notify.mq.SmsTransactionProducer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
@@ -17,6 +19,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -24,6 +27,9 @@ public class NotifyService {
 
     @Autowired
     private SiteMessageMapper siteMessageMapper;
+
+    @Autowired
+    private SmsTransactionProducer smsTransactionProducer;
 
     /** 我的站内信:按 id 倒序(雪花 id 单调递增,倒序 = 新的在前),分页 */
     public PageResult<MessageVO> page(Long userId, int pageNum, int pageSize) {
@@ -96,5 +102,22 @@ public class NotifyService {
             log.info("站内信已存在(消息重投),忽略, bizId={}", m.getBizId());
         }
     }
+
+    /** 发短信(服务间接口调用):生成 bizId → 发半消息 → 监听器落库 → 转正后消费者异步发送。
+     *  接口秒回:调用方不等真实发送。失败抛系统繁忙——日志与消息都没落地,调用方重试即可。 */
+    public void sendSms(String phone, String scene, String content) {
+        SmsTaskMessage task = new SmsTaskMessage();
+        task.setBizId(UUID.randomUUID().toString());
+        task.setPhone(phone);
+        task.setScene(scene);
+        task.setContent(content);
+        try {
+            smsTransactionProducer.sendHalf(task);
+        } catch (Exception e) {
+            log.error("短信任务提交失败, phone={}", phone, e);
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
+        }
+    }
+
 
 }
