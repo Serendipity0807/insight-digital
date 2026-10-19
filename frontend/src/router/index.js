@@ -48,6 +48,13 @@ const router = createRouter({
       name: 'pay',
       component: () => import('../views/PayView.vue'),
       meta: { auth: true }
+    },
+    // 消息中心:未登录由全局守卫送回登录页
+    {
+      path: '/notify',
+      name: 'notify',
+      component: () => import('../views/NotifyView.vue'),
+      meta: { auth: true }
     }
   ],
   // 滚动行为:换页面回顶部;返回上一页恢复原位置;带锚点(#featured)滚到锚点。

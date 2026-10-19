@@ -3,12 +3,14 @@ import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../../stores/user'
 import { useCartStore } from '../../stores/cart'
+import { useNotifyStore } from '../../stores/notify'
 import { getHotWords, suggest } from '../../api/search'
 
 const router = useRouter()
-// 登录态 + 购物车角标:都从 store 读,全站唯一
+// 登录态 + 购物车角标 + 未读消息角标:都从 store 读,全站唯一
 const userStore = useUserStore()
 const cartStore = useCartStore()
+const notifyStore = useNotifyStore()
 
 // 搜索:回车后跳首页带 ?kw=,由首页按关键字重新拉列表
 const searchKw = ref('')
@@ -71,24 +73,51 @@ watch(searchKw, () => {
   if (showPanel.value) refreshPanel()
 })
 
-// 登录成功 → 拉一次购物车,角标立即有数
+// 登录成功 → 拉一次购物车和未读数,两个角标立即有数;
+// 退出登录 → 停轮询并清零(不停的话,30 秒后轮询打到后端会 401,
+// 触发 request.js 的"清登录态跳登录页"连锁反应,把刚退出的用户又拽回登录页)
 watch(
   () => userStore.isLoggedIn,
   (on) => {
-    if (on) cartStore.load()
+    if (on) {
+      cartStore.load()
+      notifyStore.loadUnread()
+      startUnreadTimer()
+    } else {
+      clearUnreadTimer()
+      notifyStore.clear()
+    }
   }
 )
 onMounted(() => {
-  if (userStore.isLoggedIn) cartStore.load()
+  if (userStore.isLoggedIn) {
+    cartStore.load()
+    notifyStore.loadUnread()
+    startUnreadTimer()
+  }
 })
 onBeforeUnmount(() => {
   clearTimeout(suggestTimer)
   clearTimeout(blurTimer)
+  clearUnreadTimer()
 })
+
+// 未读角标轮询:30 秒一次兜底(角标不是核心链路,频率宁低勿高)。
+// 消息页标记已读后 store 会实时减数,不需要靠轮询给反馈
+let unreadTimer = null
+function startUnreadTimer() {
+  clearUnreadTimer()
+  unreadTimer = setInterval(() => notifyStore.loadUnread(), 30000)
+}
+function clearUnreadTimer() {
+  clearInterval(unreadTimer)
+  unreadTimer = null
+}
 
 function handleLogout() {
   userStore.logout()
   cartStore.clear()
+  notifyStore.clear()
 }
 </script>
 
@@ -130,6 +159,11 @@ function handleLogout() {
             </div>
           </div>
         </div>
+        <!-- 消息铃铛:复用购物车按钮的样式,角标只登录取数(store 全局唯一) -->
+        <RouterLink to="/notify" class="cart-btn" title="消息中心">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>
+          <span v-if="notifyStore.unread" class="badge">{{ notifyStore.unread > 99 ? '99+' : notifyStore.unread }}</span>
+        </RouterLink>
         <RouterLink to="/cart" class="cart-btn" title="购物车">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" /></svg>
           <span v-if="cartStore.count" class="badge">{{ cartStore.count }}</span>
