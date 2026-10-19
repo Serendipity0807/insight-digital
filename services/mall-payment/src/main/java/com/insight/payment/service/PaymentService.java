@@ -42,6 +42,11 @@ public class PaymentService {
         // 1. 查订单(内部接口):不存在/不是本人的/不是待支付 → 10701(不泄露他人订单信息)
         Result<InternalOrderVO> resp = orderClient.getOrder(req.getOrderId());
         if (resp.getCode() != Result.SUCCESS_CODE || resp.getData() == null) {
+            // 翻译成 10701 之前,必须把真实原因记进日志:
+            // order 侧任何异常都会兜成 code 10000(HTTP 200),这里统一翻译会把它彻底盖住,
+            // 没这条日志,以后再出 10701 就是盲修
+            log.warn("支付前查单失败, orderId={}, code={}, msg={}",
+                    req.getOrderId(), resp.getCode(), resp.getMessage());
             throw new BusinessException(ErrorCode.ORDER_NOT_PAYABLE);
         }
         InternalOrderVO order = resp.getData();
