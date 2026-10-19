@@ -13,7 +13,7 @@
 
     <artifactId>mall-promotion</artifactId>
     <name>mall-promotion</name>
-    <description>促销服务:秒杀(场次/预热/削峰下单/原子扣减),Sentinel 限流试点</description>
+    <description>促销服务:秒杀(场次/预热/削峰下单/原子扣减),Sentinel 限流熔断试点</description>
 
     <dependencies>
         <dependency>
@@ -54,10 +54,15 @@
             <groupId>org.apache.rocketmq</groupId>
             <artifactId>rocketmq-client</artifactId>
         </dependency>
-        <!-- Sentinel:秒杀下单接口限流(版本由 SCA BOM 管理,不写版本号) -->
+        <!-- Sentinel:秒杀下单接口限流熔断(版本由 SCA BOM 管理) -->
         <dependency>
             <groupId>com.alibaba.cloud</groupId>
             <artifactId>spring-cloud-starter-alibaba-sentinel</artifactId>
+        </dependency>
+        <!-- Sentinel 规则持久化:流控规则存 Nacos,重启不丢、改完热更新 -->
+        <dependency>
+            <groupId>com.alibaba.csp</groupId>
+            <artifactId>sentinel-datasource-nacos</artifactId>
         </dependency>
     </dependencies>
 

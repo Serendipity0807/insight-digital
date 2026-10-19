@@ -2,6 +2,7 @@ package com.insight.promotion.controller;
 
 import com.alibaba.csp.sentinel.annotation.SentinelResource;
 import com.alibaba.csp.sentinel.slots.block.BlockException;
+import com.alibaba.csp.sentinel.slots.block.degrade.DegradeException;
 import com.insight.common.result.Result;
 import com.insight.promotion.dto.SeckillGoodsVO;
 import com.insight.promotion.dto.SeckillOrderRequest;
@@ -47,9 +48,8 @@ public class SeckillController {
     }
 
     /** 秒杀下单(需登录):立即返回"排队中"+ requestId,重活进 MQ。
-     *  @SentinelResource:给接口起稳定资源名(控制台按它配规则);
-     *  不写注解的话资源名是完整 URL,路径参数变化会拆成一堆资源,规则没法配。
-     *  被限流时抛 BlockException → 走 blockHandler,返回友好文案,不进业务方法。 */
+     *  @SentinelResource:稳定资源名,限流/熔断都按它配;
+     *  被拦截时抛 BlockException → 走 blockHandler,不进业务方法。 */
     @PostMapping("/{sessionId}/order")
     @SentinelResource(value = "seckill-order", blockHandler = "orderBlockHandler")
     public Result<SeckillOrderResponseVO> order(
@@ -59,10 +59,15 @@ public class SeckillController {
         return Result.success(seckillService.order(sessionId, req.getItemId(), userId));
     }
 
-    /** 限流兜底:签名铁律——返回值与原方法一致、参数与原方法一致、末尾多一个 BlockException。
-     *  code=429 + 前端秒杀页弹层展示文案(HTTP 仍 200,request.js 会把 message 抛给页面) */
+    /** 兜底出口:限流与熔断都走这里,按 BlockException 类型给不同文案。
+     *  签名铁律——返回值与原方法一致、参数与原方法一致、末尾多一个 BlockException */
     public Result<SeckillOrderResponseVO> orderBlockHandler(
             Long sessionId, SeckillOrderRequest req, Long userId, BlockException e) {
+        if (e instanceof DegradeException) {
+            // 熔断:下游(Redis 等)出问题,服务自动快速失败
+            return Result.error(429, "秒杀服务开小差了,请稍后再试");
+        }
+        // 限流(FlowException 等):门口排队,超出阈值的直接拒
         return Result.error(429, "排队的人太多,请稍后再试");
     }
 
