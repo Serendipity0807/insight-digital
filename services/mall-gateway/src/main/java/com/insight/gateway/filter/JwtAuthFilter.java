@@ -36,7 +36,8 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
             new WhiteRule(HttpMethod.POST, "/api/v1/user/register"),
             new WhiteRule(HttpMethod.GET,  "/api/v1/user/ping"),
             new WhiteRule(HttpMethod.GET,  "/api/v1/product"),
-            new WhiteRule(HttpMethod.GET,  "/api/v1/search")
+            new WhiteRule(HttpMethod.GET,  "/api/v1/search"),
+            new WhiteRule(HttpMethod.GET,  "/api/v1/promotion")   // ← 新增:秒杀浏览公开,下单自动拦截
     );
 
     @Autowired
