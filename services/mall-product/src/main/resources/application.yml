@@ -13,3 +13,6 @@ spring:
     username: root
     password: 1234
     driver-class-name: com.mysql.cj.jdbc.Driver
+
+rocketmq:
+  name-server: 127.0.0.1:9876

@@ -1,19 +1,20 @@
 package com.insight.product.controller;
 
+import com.insight.common.result.PageResult;
 import com.insight.common.result.Result;
 import com.insight.product.dto.ProductDetailVO;
+import com.insight.product.dto.ProductListItemVO;
 import com.insight.product.dto.SkuVO;
 import com.insight.product.service.ProductService;
-import com.insight.common.result.PageResult;
-import com.insight.product.dto.ProductListItemVO;
 import jakarta.validation.constraints.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
@@ -52,5 +53,17 @@ public class ProductController {
             @RequestParam("ids") @NotEmpty(message = "ids 不能为空")
             @Size(max = 100, message = "一次最多查 100 个") List<Long> ids) {
         return Result.success(productService.listSkuByIds(ids));
+    }
+
+    /** 上下架。PUT /api/v1/product/{id}/status?status=1
+     *  事务提交后发 MQ → mall-search 增量更新 ES(上架=立刻可搜,下架=立刻搜不到) */
+    @PutMapping("/{id}/status")
+    public Result<Void> updateStatus(
+            @PathVariable("id") @Positive(message = "商品ID必须为正数") Long id,
+            @RequestParam("status")
+            @Min(value = 0, message = "status 只能 0 或 1")
+            @Max(value = 1, message = "status 只能 0 或 1") Integer status) {
+        productService.updateStatus(id, status);
+        return Result.success(null);
     }
 }

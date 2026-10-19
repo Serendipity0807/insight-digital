@@ -2,24 +2,29 @@ package com.insight.product.service;
 
 import com.alibaba.nacos.common.utils.StringUtils;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.insight.common.exception.BusinessException;
 import com.insight.common.exception.ErrorCode;
+import com.insight.common.mq.ProductChangeMessage;
+import com.insight.common.result.PageResult;
+import com.insight.common.search.EsProductDoc;
 import com.insight.product.dto.ProductDetailVO;
+import com.insight.product.dto.ProductListItemVO;
 import com.insight.product.dto.SkuVO;
 import com.insight.product.entity.Sku;
 import com.insight.product.entity.Spu;
 import com.insight.product.mapper.SkuMapper;
 import com.insight.product.mapper.SpuMapper;
+import com.insight.product.mq.ProductChangeProducer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.insight.common.result.PageResult;
-import com.insight.product.dto.ProductListItemVO;
+import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -31,6 +36,12 @@ public class ProductService {
 
     @Autowired
     private SkuMapper skuMapper;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
+
+    @Autowired
+    private ProductChangeProducer productChangeProducer;
 
     /** 按 id 查询商品详情(SPU + 该 SPU 下所有 SKU) */
     public ProductDetailVO detail(Long id) {
@@ -128,4 +139,67 @@ public class ProductService {
         }).toList();
     }
 
+    /** 上下架:status=1 上架 / 0 下架。
+     *  事务提交后才发 MQ——execute 返回时事务已提交,消费者拿到的消息
+     *  一定对应"库里已生效的新值"(消息绝不会比数据快一步)。 */
+    public void updateStatus(Long id, Integer status) {
+        // 1. 事务内:校验存在 + 更新。返回更新后的 SPU;状态没变返回 null(幂等:不发无意义消息)
+        Spu updated = transactionTemplate.execute(tx -> {
+            Spu spu = spuMapper.selectById(id);
+            if (spu == null) {
+                throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
+            }
+            if (spu.getStatus().equals(status)) {
+                return null;
+            }
+            Spu patch = new Spu();
+            patch.setId(id);
+            patch.setStatus(status);
+            spuMapper.updateById(patch);
+            spu.setStatus(status);
+            return spu;
+        });
+        if (updated == null) {
+            return;
+        }
+        // 2. 事务已提交,发消息:上架 → UPSERT 整条文档;下架 → DELETE 只带 id
+        ProductChangeMessage msg = new ProductChangeMessage();
+        msg.setSpuId(id);
+        if (status == 1) {
+            msg.setType(ProductChangeMessage.TYPE_UPSERT);
+            msg.setDoc(buildDoc(updated));
+        } else {
+            msg.setType(ProductChangeMessage.TYPE_DELETE);
+        }
+        productChangeProducer.send(msg);
+    }
+
+    /** 组装 ES 文档:12 个字段与全量同步脚本一一对应;
+     *  minPrice 口径 = MIN(在售 SKU 价格),无在售 SKU 时为 0(与全量脚本 LEFT JOIN 语义一致) */
+    private EsProductDoc buildDoc(Spu spu) {
+        Integer minPrice = skuMapper.selectList(
+                        new LambdaQueryWrapper<Sku>()
+                                .eq(Sku::getSpuId, spu.getId())
+                                .eq(Sku::getStatus, 1))
+                .stream()
+                .map(Sku::getPrice)
+                .min(Integer::compareTo)
+                .orElse(0);
+        EsProductDoc doc = new EsProductDoc();
+        doc.setId(spu.getId());
+        doc.setName(spu.getName());
+        doc.setTagline(spu.getTagline());
+        doc.setDescription(spu.getDescription());
+        doc.setBrandId(spu.getBrandId());
+        doc.setCategoryId(spu.getCategoryId());
+        doc.setSales(spu.getSales());
+        doc.setStatus(spu.getStatus());
+        doc.setTag(spu.getTag());
+        doc.setMainImage(spu.getMainImage());
+        // ES mapping 里 createdAt 是 date 类型;格式与全量脚本写入的一致,避免两种格式混存
+        doc.setCreatedAt(spu.getCreatedAt() == null ? null
+                : spu.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")));
+        doc.setMinPrice(minPrice);
+        return doc;
+    }
 }
