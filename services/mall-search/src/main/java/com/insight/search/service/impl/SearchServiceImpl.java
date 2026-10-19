@@ -8,6 +8,7 @@ import co.elastic.clients.json.JsonData;
 import com.insight.common.exception.BusinessException;
 import com.insight.common.exception.ErrorCode;
 import com.insight.common.result.PageResult;
+import com.insight.search.dto.HotWordVO;
 import com.insight.search.dto.SearchItemVO;
 import com.insight.search.service.SearchService;
 import lombok.RequiredArgsConstructor;
@@ -16,10 +17,11 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 
 @Service
-@Slf4j
 @RequiredArgsConstructor
+@Slf4j
 public class SearchServiceImpl implements SearchService {
 
     /** 只认别名:以后换索引只动别名指向,代码永远不改 */
@@ -79,7 +81,7 @@ public class SearchServiceImpl implements SearchService {
         try {
             resp = esClient.search(request, SearchItemVO.class);
         } catch (IOException e) {
-            // 先记真实原因再兜码:否则 10801 把锅全藏起来,排查只能靠猜
+            // 兜底之前先留证据:把真实异常记进日志,排查时看控制台第一行就知道原因
             log.error("搜索请求失败:{}", e.getMessage(), e);
             throw new BusinessException(ErrorCode.SEARCH_TIMEOUT);
         }
@@ -90,5 +92,45 @@ public class SearchServiceImpl implements SearchService {
                 .toList();
         long total = resp.hits().total() != null ? resp.hits().total().value() : 0;
         return PageResult.of(total, records);
+    }
+
+    @Override
+    public List<HotWordVO> hot(int size) {
+        SearchResponse<SearchItemVO> resp;
+        try {
+            resp = esClient.search(req -> req
+                            .index(INDEX_ALIAS)
+                            .size(0)                                          // 只要聚合结果,不要文档
+                            .aggregations("hot_tags", a -> a.terms(t -> t
+                                    .field("tag")                             // tag 是 keyword,可聚合
+                                    .size(size))),
+                    SearchItemVO.class);
+        } catch (IOException e) {
+            log.error("热词聚合失败:{}", e.getMessage(), e);
+            throw new BusinessException(ErrorCode.SEARCH_TIMEOUT);
+        }
+        return resp.aggregations().get("hot_tags").sterms().buckets().array().stream()
+                .map(b -> new HotWordVO(b.key().stringValue(), b.docCount()))
+                .toList();
+    }
+
+    @Override
+    public List<String> suggest(String prefix) {
+        SearchResponse<SearchItemVO> resp;
+        try {
+            resp = esClient.search(req -> req
+                            .index(INDEX_ALIAS)
+                            .size(10)
+                            .source(src -> src.filter(f -> f.includes("name")))   // 只要名字
+                            .query(q -> q.prefix(p -> p.field("name").value(prefix))),
+                    SearchItemVO.class);
+        } catch (IOException e) {
+            log.error("联想词查询失败:{}", e.getMessage(), e);
+            throw new BusinessException(ErrorCode.SEARCH_TIMEOUT);
+        }
+        return resp.hits().hits().stream()
+                .map(h -> h.source() == null ? null : h.source().getName())
+                .filter(Objects::nonNull)
+                .toList();
     }
 }
