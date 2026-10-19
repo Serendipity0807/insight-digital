@@ -37,7 +37,7 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
             new WhiteRule(HttpMethod.GET,  "/api/v1/user/ping"),
             new WhiteRule(HttpMethod.GET,  "/api/v1/product"),
             new WhiteRule(HttpMethod.GET,  "/api/v1/search"),
-            new WhiteRule(HttpMethod.GET,  "/api/v1/promotion")   // ← 新增:秒杀浏览公开,下单自动拦截
+            new WhiteRule(HttpMethod.GET,  "/api/v1/promotion")   // 秒杀浏览公开,下单自动拦截
     );
 
     @Autowired
@@ -50,12 +50,15 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String path = exchange.getRequest().getURI().getPath();
         HttpMethod method = exchange.getRequest().getMethod();
-        // 1. 白名单直接放行(前缀匹配必须加 "/",否则 /api/v1/productXxx 会被误放行)
+
+        // 1. 白名单:不强制登录。但带了合法 token 仍验签并透传 X-User-Id——
+        //    同一前缀下公开接口与需身份接口混居(如 promotion 下 goods 公开、result 要 userId),
+        //    网关不替下游决定身份:有 token 就验,验过就传。
         if (isWhiteListed(method, path)) {
-            return chain.filter(exchange);
+            return passWithOptionalIdentity(exchange, chain);
         }
 
-        // 2. 取 Authorization 头,必须是 "Bearer xxx" 格式
+        // 2. 非白名单:必须有合法 token
         String auth = exchange.getRequest().getHeaders().getFirst("Authorization");
         if (auth == null || !auth.startsWith("Bearer ")) {
             return unauthorized(exchange);
@@ -73,6 +76,29 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
         } catch (JwtException | IllegalArgumentException e) {
             return unauthorized(exchange);
         }
+    }
+
+    /** 白名单放行 + 尽力透传身份:token 合法则 set X-User-Id;
+     *  没有/不合法则剥掉客户端自带的 X-User-Id 后放行 */
+    private Mono<Void> passWithOptionalIdentity(ServerWebExchange exchange, GatewayFilterChain chain) {
+        String auth = exchange.getRequest().getHeaders().getFirst("Authorization");
+        if (auth != null && auth.startsWith("Bearer ")) {
+            try {
+                Claims claims = jwtUtil.parse(auth.substring(7));
+                Long userId = Long.valueOf(claims.getSubject());
+                ServerHttpRequest mutated = exchange.getRequest().mutate()
+                        .headers(h -> h.set("X-User-Id", String.valueOf(userId)))
+                        .build();
+                return chain.filter(exchange.mutate().request(mutated).build());
+            } catch (JwtException | IllegalArgumentException e) {
+                // 路径公开,坏 token 不拦(前端会因其他需登录接口的 401 而清态),落到下面剥身份
+            }
+        }
+        // 没带 token 或 token 无效:剥掉客户端伪造的 X-User-Id——白名单放行 ≠ 相信客户端自报身份
+        ServerHttpRequest stripped = exchange.getRequest().mutate()
+                .headers(h -> h.remove("X-User-Id"))
+                .build();
+        return chain.filter(exchange.mutate().request(stripped).build());
     }
 
     /** 方法与路径前缀同时匹配才算白名单命中 */

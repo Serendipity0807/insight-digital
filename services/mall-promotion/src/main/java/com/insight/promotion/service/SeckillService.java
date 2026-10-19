@@ -10,14 +10,19 @@ import com.insight.promotion.dto.SeckillOrderResponseVO;
 import com.insight.promotion.dto.SeckillResultVO;
 import com.insight.promotion.dto.SessionVO;
 import com.insight.promotion.entity.SeckillItem;
+import com.insight.promotion.entity.SeckillOrder;
 import com.insight.promotion.entity.SeckillSession;
 import com.insight.promotion.mapper.SeckillItemMapper;
+import com.insight.promotion.mapper.SeckillOrderMapper;
 import com.insight.promotion.mapper.SeckillSessionMapper;
 import com.insight.promotion.mq.SeckillOrderMessage;
 import com.insight.promotion.mq.SeckillOrderProducer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -42,11 +47,23 @@ public class SeckillService {
     /** 结果快照存活 30 分钟:排队+消费早就完成,过期自动清理 */
     private static final long RESULT_TTL_MINUTES = 30;
 
+    /** Lua 原子扣减脚本:检查+扣减+防重标记四步一次完成,见 resources/lua/seckill_deduct.lua */
+    private static final DefaultRedisScript<Long> SECKILL_DEDUCT_SCRIPT;
+
+    static {
+        SECKILL_DEDUCT_SCRIPT = new DefaultRedisScript<>();
+        SECKILL_DEDUCT_SCRIPT.setLocation(new ClassPathResource("lua/seckill_deduct.lua"));
+        SECKILL_DEDUCT_SCRIPT.setResultType(Long.class);
+    }
+
     @Autowired
     private SeckillSessionMapper sessionMapper;
 
     @Autowired
     private SeckillItemMapper itemMapper;
+
+    @Autowired
+    private SeckillOrderMapper seckillOrderMapper;
 
     @Autowired
     private StringRedisTemplate redisTemplate;
@@ -170,6 +187,84 @@ public class SeckillService {
         return new SeckillOrderResponseVO(requestId, SeckillResultVO.STATUS_QUEUING);
     }
 
+    /** 消费侧:一条秒杀消息的完整处理(Lua 原子扣减 → 异步建单 → 改写结果)。
+     *  抛异常 = 让消费者重试(建单失败回补后重投);能走到写结果的都是终态,天然幂等。 */
+    public void handleSeckillMessage(SeckillOrderMessage msg) {
+        // 1. Lua 原子扣减:检查 + 扣减 + 标记一步完成,任何并发请求都插不进来
+        Long r = redisTemplate.execute(SECKILL_DEDUCT_SCRIPT,
+                List.of(stockKey(msg.getItemId()), userKey(msg.getItemId())),
+                String.valueOf(msg.getUserId()));
+        int code = (r == null) ? -1 : r.intValue();
+
+        SeckillResultVO result = new SeckillResultVO();
+        result.setUserId(msg.getUserId());
+
+        switch (code) {
+            case 1 -> {
+                SeckillOrder order = new SeckillOrder();
+                order.setRequestId(msg.getRequestId());
+                order.setSessionId(msg.getSessionId());
+                order.setItemId(msg.getItemId());
+                order.setUserId(msg.getUserId());
+                order.setSkuId(msg.getSkuId());
+                order.setSeckillPrice(msg.getSeckillPrice());
+                order.setStatus(1);
+                try {
+                    // id 由 MyBatis-Plus 雪花算法生成(@TableId ASSIGN_ID)
+                    seckillOrderMapper.insert(order);
+                    result.setStatus(SeckillResultVO.STATUS_SUCCESS);
+                    result.setOrderId(order.getId());
+                    log.info("秒杀抢购成功, requestId={}, userId={}, orderId={}",
+                            msg.getRequestId(), msg.getUserId(), order.getId());
+                } catch (DuplicateKeyException e) {
+                    // 第三层防重兜底(唯一索引):requestId 的单已存在 = 消息重投,补写结果即可
+                    SeckillOrder existed = findOrderByRequestId(msg.getRequestId());
+                    if (existed != null) {
+                        result.setStatus(SeckillResultVO.STATUS_SUCCESS);
+                        result.setOrderId(existed.getId());
+                    } else {
+                        // uk_user_item 冲突(同人同商品,Lua 没拦住的理论极端)
+                        result.setStatus(SeckillResultVO.STATUS_FAILED);
+                        result.setReason("已抢过");
+                    }
+                } catch (Exception e) {
+                    // 建单失败(数据库抖动等):把 Lua 扣掉的还回去(摘标记 + 库存加回),
+                    // 再抛出去让 MQ 重投——重投时重新走一遍完整流程。
+                    redisTemplate.opsForSet()
+                            .remove(userKey(msg.getItemId()), String.valueOf(msg.getUserId()));
+                    redisTemplate.opsForValue().increment(stockKey(msg.getItemId()));
+                    throw e;
+                }
+            }
+            case 0 -> {
+                result.setStatus(SeckillResultVO.STATUS_SOLD_OUT);
+                log.info("秒杀已售罄, requestId={}, itemId={}", msg.getRequestId(), msg.getItemId());
+            }
+            case -1 -> {
+                result.setStatus(SeckillResultVO.STATUS_FAILED);
+                result.setReason("活动未预热,请稍后重试");
+                log.error("秒杀库存 key 不存在(可能未预热), requestId={}, itemId={}",
+                        msg.getRequestId(), msg.getItemId());
+            }
+            case -2 -> {
+                // 已在抢到标记里:查一次是"重投补写结果"还是"真重复抢购"
+                SeckillOrder existed = findOrderByRequestId(msg.getRequestId());
+                if (existed != null) {
+                    result.setStatus(SeckillResultVO.STATUS_SUCCESS);
+                    result.setOrderId(existed.getId());
+                } else {
+                    result.setStatus(SeckillResultVO.STATUS_FAILED);
+                    result.setReason("已抢过");
+                }
+            }
+            default -> {
+                result.setStatus(SeckillResultVO.STATUS_FAILED);
+                result.setReason("未知错误");
+            }
+        }
+        writeResult(msg.getRequestId(), result);
+    }
+
     /** 轮询结果:只认自己取的号(快照里存了 userId,防拿别人的 requestId 偷看) */
     public SeckillResultVO result(Long sessionId, String requestId, Long userId) {
         String json = redisTemplate.opsForValue().get(resultKey(requestId));
@@ -185,6 +280,13 @@ public class SeckillService {
         } catch (JsonProcessingException e) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
+    }
+
+    /** 按 requestId 查订单:重投幂等时确认"单其实早就建好了" */
+    private SeckillOrder findOrderByRequestId(String requestId) {
+        return seckillOrderMapper.selectOne(
+                new LambdaQueryWrapper<SeckillOrder>()
+                        .eq(SeckillOrder::getRequestId, requestId));
     }
 
     /** 写结果快照(下单写排队中,消费端写终态,共用这个方法) */
