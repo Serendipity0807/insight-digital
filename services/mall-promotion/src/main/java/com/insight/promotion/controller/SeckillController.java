@@ -1,5 +1,7 @@
 package com.insight.promotion.controller;
 
+import com.alibaba.csp.sentinel.annotation.SentinelResource;
+import com.alibaba.csp.sentinel.slots.block.BlockException;
 import com.insight.common.result.Result;
 import com.insight.promotion.dto.SeckillGoodsVO;
 import com.insight.promotion.dto.SeckillOrderRequest;
@@ -37,8 +39,7 @@ public class SeckillController {
         return Result.success(seckillService.listSessions());
     }
 
-    /** 场次商品列表(公开)。GET /api/v1/promotion/seckill/{sessionId}/goods
-     *  商品名/图片前端拿 skuId 调 /api/v1/product/sku/batch 组装 */
+    /** 场次商品列表(公开)。GET /api/v1/promotion/seckill/{sessionId}/goods */
     @GetMapping("/{sessionId}/goods")
     public Result<List<SeckillGoodsVO>> listGoods(
             @PathVariable("sessionId") @Positive(message = "场次ID必须为正数") Long sessionId) {
@@ -46,13 +47,23 @@ public class SeckillController {
     }
 
     /** 秒杀下单(需登录):立即返回"排队中"+ requestId,重活进 MQ。
-     *  userId 来自网关验签后透传的 X-User-Id——身份以网关为准,不信客户端自己报的 id */
+     *  @SentinelResource:给接口起稳定资源名(控制台按它配规则);
+     *  不写注解的话资源名是完整 URL,路径参数变化会拆成一堆资源,规则没法配。
+     *  被限流时抛 BlockException → 走 blockHandler,返回友好文案,不进业务方法。 */
     @PostMapping("/{sessionId}/order")
+    @SentinelResource(value = "seckill-order", blockHandler = "orderBlockHandler")
     public Result<SeckillOrderResponseVO> order(
             @PathVariable("sessionId") @Positive(message = "场次ID必须为正数") Long sessionId,
             @RequestBody @Valid SeckillOrderRequest req,
             @RequestHeader("X-User-Id") Long userId) {
         return Result.success(seckillService.order(sessionId, req.getItemId(), userId));
+    }
+
+    /** 限流兜底:签名铁律——返回值与原方法一致、参数与原方法一致、末尾多一个 BlockException。
+     *  code=429 + 前端秒杀页弹层展示文案(HTTP 仍 200,request.js 会把 message 抛给页面) */
+    public Result<SeckillOrderResponseVO> orderBlockHandler(
+            Long sessionId, SeckillOrderRequest req, Long userId, BlockException e) {
+        return Result.error(429, "排队的人太多,请稍后再试");
     }
 
     /** 秒杀结果轮询(需登录)。GET /api/v1/promotion/seckill/{sessionId}/result?requestId=xxx */

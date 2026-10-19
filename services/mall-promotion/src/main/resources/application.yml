@@ -8,6 +8,11 @@ spring:
     nacos:
       discovery:
         server-addr: localhost:8848
+    sentinel:
+      eager: true          # 启动即向控制台注册:否则"懒加载",没有流量时控制台根本看不到本服务
+      transport:
+        dashboard: localhost:8858   # 控制台地址
+        port: 8719                  # 本机开一个端口,控制台靠它下发规则/收监控数据(不要与别的服务冲突)
   datasource:
     url: jdbc:mysql://localhost:3306/mall_promotion?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     username: root
