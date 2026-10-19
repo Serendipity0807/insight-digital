@@ -12,3 +12,9 @@ export function getProductPage(params) {
 export function getProductDetail(id) {
   return request.get(`/v1/product/${id}`)
 }
+
+/** 批量查 SKU 摘要(秒杀页等按 skuId 组装商品名/图片/原价)。
+ *  GET /api/v1/product/sku/batch?ids=10041,10042 —— 逗号分隔,后端自动转 List */
+export function getSkuBatch(skuIds) {
+  return request.get('/v1/product/sku/batch', { params: { ids: skuIds.join(',') } })
+}

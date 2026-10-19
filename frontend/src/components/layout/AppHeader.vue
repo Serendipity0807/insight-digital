@@ -111,6 +111,7 @@ function handleLogout() {
         <RouterLink to="/" class="nav-link">首页</RouterLink>
         <RouterLink :to="{ path: '/', hash: '#featured' }" class="nav-link">全部商品</RouterLink>
         <RouterLink to="/compare" class="nav-link">慧眼对比</RouterLink>
+        <RouterLink to="/seckill" class="nav-link">限时秒杀</RouterLink>
       </nav>
 
       <div class="actions">

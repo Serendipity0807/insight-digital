@@ -24,6 +24,12 @@ const router = createRouter({
       name: 'compare',
       component: () => import('../views/CompareView.vue')
     },
+    // 秒杀页:浏览公开(不加 meta.auth),点抢购时由页面自己引导登录
+    {
+      path: '/seckill',
+      name: 'seckill',
+      component: () => import('../views/SeckillView.vue')
+    },
     // meta.auth:需要登录的页面——没 token 由全局守卫送回登录页
     {
       path: '/cart',
@@ -45,16 +51,16 @@ const router = createRouter({
     }
   ],
   // 滚动行为:换页面回顶部;返回上一页恢复原位置;带锚点(#featured)滚到锚点。
-  // 修掉两个体验问题:①从首页中部点进详情页,视角还停在中间 ②"全部商品"锚点在别的页面失效
-  scrollBehavior(to, from, savedPosition) {
-    if (to.hash) {
-      return { el: to.hash, behavior: 'smooth' }
-    }
-    if (savedPosition) {
-      return savedPosition
-    }
-    return { top: 0 }
+// 修掉两个体验问题:①从首页中部点进详情页,视角还停在中间 ②"全部商品"锚点在别的页面失效
+scrollBehavior(to, from, savedPosition) {
+  if (to.hash) {
+    return { el: to.hash, behavior: 'smooth' }
   }
+  if (savedPosition) {
+    return savedPosition
+  }
+  return { top: 0 }
+}
 })
 
 // 全局前置守卫:meta.auth 的路由必须已登录。
