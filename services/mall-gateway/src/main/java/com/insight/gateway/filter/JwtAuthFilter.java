@@ -24,12 +24,13 @@ import java.util.List;
 @Component
 public class JwtAuthFilter implements GlobalFilter, Ordered {
 
-    /** 白名单:登录/注册/探活 + 商品浏览(公开资源) */
+    /** 白名单:登录/注册/探活 + 商品浏览与搜索(公开资源) */
     private static final List<String> WHITE_LIST = List.of(
             "/api/v1/user/login",
             "/api/v1/user/register",
             "/api/v1/user/ping",
-            "/api/v1/product"
+            "/api/v1/product",
+            "/api/v1/search"
     );
 
     @Autowired

@@ -3,27 +3,58 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ProductCard from '../components/product/ProductCard.vue'
 import CompareBar from '../components/product/CompareBar.vue'
-import { getProductPage } from '../api/product'
+import { searchProducts } from '../api/search'
 
 const route = useRoute()
 const router = useRouter()
 
-// 首页精选:从后端分页接口拿真数据(替代原来的 mock)
+// 商品列表:来自 ES 搜索(替代原来的 /page 临时方案)
 const products = ref([])
 const loading = ref(true)
 const error = ref('')
 
-// 搜索关键字:来自导航栏搜索框(回车后跳首页带 ?kw=xx)。
-// 前端只负责透传给 /page 接口;后端目前还没接 kw 参数,补丁打好前搜不出结果。
+// —— 查询状态:关键字来自 URL,其余来自筛选栏,统一驱动一次搜索 ——
 const kw = computed(() => (route.query.kw || '').trim())
+const page = ref(1)
+const size = 12
+const total = ref(0)
+const sort = ref('default')
+const minPrice = ref('')   // 单位:元(输入用元,提交前换成分)
+const maxPrice = ref('')
+
+// 排序白名单:value 与后端 sort 参数一一对应
+const sortOptions = [
+  { value: 'default', label: '综合' },
+  { value: 'sales', label: '销量' },
+  { value: 'price_asc', label: '价格从低到高' },
+  { value: 'price_desc', label: '价格从高到低' },
+  { value: 'newest', label: '最新上架' }
+]
+
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / size)))
+
+// 元 → 分:后端价格单位是分(数据库铁律);空值返回 undefined,axios 会自动忽略
+const toFen = (yuan) => {
+  if (yuan === '' || yuan === null || yuan === undefined) return undefined
+  const n = Number(yuan)
+  return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : undefined
+}
 
 const loadProducts = async () => {
   loading.value = true
   error.value = ''
   try {
-    // undefined 的 kw axios 会自动忽略,不带在 URL 上
-    const data = await getProductPage({ page: 1, size: 12, kw: kw.value || undefined })
+    // undefined 的参数 axios 会自动忽略,不带在 URL 上
+    const data = await searchProducts({
+      keyword: kw.value || undefined,
+      sort: sort.value,
+      minPrice: toFen(minPrice.value),
+      maxPrice: toFen(maxPrice.value),
+      page: page.value,
+      size
+    })
     products.value = data.records
+    total.value = data.total
   } catch (e) {
     error.value = e.message || '加载失败'
   } finally {
@@ -33,11 +64,35 @@ const loadProducts = async () => {
 
 onMounted(loadProducts)
 
-// 关键字变化(从别的页面回车搜索 / 清空搜索)重新拉列表,并滚到商品区
+// 关键字变化(从别的页面回车搜索 / 清空搜索)→ 回第 1 页重搜,并滚到商品区
 watch(kw, async () => {
+  page.value = 1
   await loadProducts()
   document.getElementById('featured')?.scrollIntoView({ behavior: 'smooth' })
 })
+
+// 排序 / 筛选变化:回到第 1 页重搜(不滚动,保持当前位置)
+function applyFilters() {
+  page.value = 1
+  loadProducts()
+}
+function changeSort() {
+  page.value = 1
+  loadProducts()
+}
+function goPage(p) {
+  if (p < 1 || p > totalPages.value || p === page.value) return
+  page.value = p
+  loadProducts()
+  document.getElementById('featured')?.scrollIntoView({ behavior: 'smooth' })
+}
+function resetFilters() {
+  sort.value = 'default'
+  minPrice.value = ''
+  maxPrice.value = ''
+  page.value = 1
+  loadProducts()
+}
 
 const scrollToFeatured = () => {
   document.getElementById('featured')?.scrollIntoView({ behavior: 'smooth' })
@@ -155,6 +210,25 @@ const clearSearch = () => router.push({ path: '/' })
         </div>
       </header>
 
+      <!-- 筛选工具栏:价格区间 + 排序 -->
+      <div class="toolbar glass">
+        <div class="toolbar-price">
+          <span class="toolbar-label">价格</span>
+          <input v-model="minPrice" type="number" min="0" placeholder="最低价" />
+          <span class="toolbar-sep">—</span>
+          <input v-model="maxPrice" type="number" min="0" placeholder="最高价" />
+          <span class="toolbar-unit">元</span>
+          <button class="toolbar-btn" @click="applyFilters">应用</button>
+        </div>
+        <div class="toolbar-sort">
+          <span class="toolbar-label">排序</span>
+          <select v-model="sort" @change="changeSort">
+            <option v-for="o in sortOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
+          </select>
+        </div>
+        <button v-if="sort !== 'default' || minPrice || maxPrice" class="toolbar-reset" @click="resetFilters">清空筛选</button>
+      </div>
+
       <!-- 加载态:骨架屏(占位块,不转圈) -->
       <div v-if="loading" class="grid">
         <div v-for="i in 6" :key="i" class="card-skeleton skeleton"></div>
@@ -175,6 +249,16 @@ const clearSearch = () => router.push({ path: '/' })
       <!-- 数据 -->
       <div v-else class="grid">
         <ProductCard v-for="p in products" :key="p.id" :product="p" />
+      </div>
+
+      <!-- 结果统计 + 分页 -->
+      <div v-if="!loading && !error" class="list-footer">
+        <span class="list-count">共 {{ total }} 件商品</span>
+        <div class="pagination">
+          <button class="page-btn" :disabled="page <= 1" @click="goPage(page - 1)">上一页</button>
+          <span class="page-info num">{{ page }} / {{ totalPages }}</span>
+          <button class="page-btn" :disabled="page >= totalPages" @click="goPage(page + 1)">下一页</button>
+        </div>
       </div>
     </section>
 
@@ -332,6 +416,78 @@ const clearSearch = () => router.push({ path: '/' })
   color: var(--c-text-dim);
 }
 .state p { margin-bottom: var(--s-5); }
+
+/* ===== 筛选工具栏 ===== */
+.toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-5);
+  padding: var(--s-4) var(--s-5);
+  margin-bottom: var(--s-6);
+  border-radius: var(--r-md);
+}
+.toolbar-label { font-size: 12px; color: var(--c-text-faint); letter-spacing: 1px; }
+.toolbar-price { display: flex; align-items: center; gap: var(--s-2); }
+.toolbar-sort { display: flex; align-items: center; gap: var(--s-2); }
+.toolbar-sep { color: var(--c-text-faint); }
+.toolbar-unit { font-size: 12px; color: var(--c-text-faint); }
+.toolbar input,
+.toolbar select {
+  background: var(--c-bg-raised);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-sm);
+  color: var(--c-text);
+  font-size: 13px;
+  padding: 8px 12px;
+  outline: none;
+  transition: border-color var(--t-fast) var(--ease-out);
+}
+.toolbar input { width: 96px; }
+.toolbar input:focus,
+.toolbar select:focus { border-color: var(--c-accent); }
+.toolbar select { cursor: pointer; }
+.toolbar-btn {
+  font-size: 12px;
+  color: #fff;
+  background: var(--c-accent);
+  border: none;
+  border-radius: var(--r-sm);
+  padding: 8px 14px;
+  transition: filter var(--t-fast) var(--ease-out);
+}
+.toolbar-btn:hover { filter: brightness(1.1); }
+.toolbar-reset {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--c-text-faint);
+  background: none;
+  border: none;
+  transition: color var(--t-fast) var(--ease-out);
+}
+.toolbar-reset:hover { color: var(--c-danger); }
+
+/* ===== 结果统计 + 分页 ===== */
+.list-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--s-7);
+}
+.list-count { font-size: 13px; color: var(--c-text-faint); }
+.pagination { display: flex; align-items: center; gap: var(--s-3); }
+.page-btn {
+  font-size: 13px;
+  color: var(--c-text-dim);
+  background: var(--c-glass);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-pill);
+  padding: 8px 18px;
+  transition: color var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out);
+}
+.page-btn:hover:not(:disabled) { color: var(--c-text); border-color: var(--c-accent); }
+.page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.page-info { font-size: 13px; color: var(--c-text-dim); }
 
 /* ===== 对比预告 ===== */
 .compare-teaser { margin-top: var(--s-12); }
