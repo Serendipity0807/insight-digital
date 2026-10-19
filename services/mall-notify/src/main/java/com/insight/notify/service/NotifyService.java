@@ -69,25 +69,32 @@ public class NotifyService {
     }
 
     /** 消费订单事件 → 生成站内信。
-     *  消费幂等两层:①同一事件重投,bizId 相同,uk_biz 唯一索引直接 DuplicateKey,捕获后忽略;
-     *  ②不同事件类型(如 CANCELLED)不同 bizId,互不干扰。 */
+     *  一条 topic 两个事件类型:CREATED 下单成功 / CANCELLED 订单关闭。
+     *  消费幂等两层:①同一事件重投,bizId 相同,uk_biz 唯一索引 DuplicateKey,捕获忽略;
+     *  ②同一订单不同类型 bizId 不同(订单号-CREATED / 订单号-CANCELLED),两条消息并存互不干扰。 */
     public void handleOrderEvent(OrderEventMessage msg) {
-        if (!OrderEventMessage.TYPE_CREATED.equals(msg.getType())) {
+        SiteMessage m = new SiteMessage();
+        m.setUserId(msg.getUserId());
+        m.setBizId(msg.getOrderId() + "-" + msg.getType());   // 唯一键:一单一事件一条消息
+        m.setIsRead(0);
+        if (OrderEventMessage.TYPE_CREATED.equals(msg.getType())) {
+            m.setTitle("下单成功");
+            m.setContent("您的订单 " + msg.getOrderId() + " 已创建成功,实付 ¥"
+                    + new BigDecimal(msg.getPayAmount()).movePointLeft(2) + ",请在 30 分钟内完成支付");
+        } else if (OrderEventMessage.TYPE_CANCELLED.equals(msg.getType())) {
+            m.setTitle("订单已关闭");
+            m.setContent("您的订单 " + msg.getOrderId() + " 已关闭,喜欢的话可以重新下单~");
+        } else {
             log.info("未处理的事件类型, type={}", msg.getType());
             return;
         }
-        SiteMessage m = new SiteMessage();
-        m.setUserId(msg.getUserId());
-        m.setBizId(msg.getOrderId() + "-" + msg.getType());   // 一单一事件一条消息:幂等键
-        m.setTitle("下单成功");
-        m.setContent("您的订单 " + msg.getOrderId() + " 已创建成功,实付 ¥"
-                + new BigDecimal(msg.getPayAmount()).movePointLeft(2) + ",请在 30 分钟内完成支付");
-        m.setIsRead(0);
         try {
             siteMessageMapper.insert(m);
-            log.info("站内信已生成, orderId={}, userId={}", msg.getOrderId(), msg.getUserId());
+            log.info("站内信已生成, type={}, orderId={}, userId={}",
+                    msg.getType(), msg.getOrderId(), msg.getUserId());
         } catch (DuplicateKeyException e) {
             log.info("站内信已存在(消息重投),忽略, bizId={}", m.getBizId());
         }
     }
+
 }

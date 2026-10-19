@@ -262,14 +262,44 @@ public class OrderService {
     /**
      * 超时关单(消息消费者调用,TM=order):
      * 和 markPaid 抢同一个闸门 WHERE status=10——状态机 CAS 先到先得。
-     * 支付先到 → 这里 0 行 → 幂等放弃(库存已在支付链路扣减,绝不能释放);
+     * 支付先到 → 这里 0 行 → 返回 null(库存已在支付链路扣减,绝不能释放);
      * 这里先到 → markPaid 0 行 → 支付回调抛 10502,全局回滚。
-     * 消息重复投递同理:第一次已把状态改掉,重复进来 0 行直接返回——状态机让关单天然幂等。
+     * 返回被关闭的订单(调用方据此发 CANCELLED 事件);没关成返回 null——
+     * 重复消息/已支付绝不发取消通知。消息重复投递同理:第一次已把状态改掉,重复进来 0 行。
      */
     @Transactional
     @GlobalTransactional
-    public void closeOrder(Long orderId) {
-        // 1. 状态机闸门:10→0。0 行 = 已支付/已取消/重复消息,幂等返回
+    public Order closeOrder(Long orderId) {
+        return closeOrderInternal(orderId, "超时未支付,自动关单");
+    }
+
+    /**
+     * 用户主动取消(Controller 调用,TM=order):
+     * 先做归属与状态校验,再走与超时关单同一套核心逻辑。
+     * 注意:不能直接调 this.closeOrder()——同类的自调用会让 AOP 代理失效,
+     * @Transactional/@GlobalTransactional 全部不生效!所以核心拆到无注解的
+     * closeOrderInternal,两个入口各自带注解、各自被外部调用,共享核心。
+     */
+    @Transactional
+    @GlobalTransactional
+    public Order cancel(Long userId, Long orderId) {
+        Order order = orderMapper.selectById(orderId);
+        // 不存在/不是自己的:统一报状态异常,不暴露别人订单的存在性(防探测)
+        if (order == null || !order.getUserId().equals(userId)) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID);
+        }
+        if (order.getStatus() == STATUS_CANCELLED) {
+            return null;   // 已取消:幂等成功,不发事件(避免重复通知)
+        }
+        if (order.getStatus() != STATUS_PENDING) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID);
+        }
+        return closeOrderInternal(orderId, "用户主动取消");
+    }
+
+    /** 关单核心(无注解,事务由两个入口提供):闸门 10→0 + 日志 + 释放库存 + 关支付单 */
+    private Order closeOrderInternal(Long orderId, String remark) {
+        // 1. 状态机闸门:10→0。0 行 = 已支付/已取消/重复消息,返回 null(调用方不发事件)
         int rows = orderMapper.update(null,
                 new LambdaUpdateWrapper<Order>()
                         .set(Order::getStatus, STATUS_CANCELLED)
@@ -277,16 +307,16 @@ public class OrderService {
                         .eq(Order::getStatus, STATUS_PENDING));
         if (rows == 0) {
             log.info("关单跳过(订单已不在待支付状态), orderId={}", orderId);
-            return;
+            return null;
         }
 
-        // 2. 状态日志:只追加,不覆盖
+        // 2. 状态日志:只追加,不覆盖(remark 区分两条关单路)
         OrderLog logRow = new OrderLog();
         logRow.setOrderId(orderId);
         logRow.setFromStatus(STATUS_PENDING);
         logRow.setToStatus(STATUS_CANCELLED);
         logRow.setOperator(OPERATOR_SYSTEM);
-        logRow.setRemark("超时未支付,自动关单");
+        logRow.setRemark(remark);
         orderLogMapper.insert(logRow);
 
         // 3. 释放库存(Feign 子分支):locked 回补 saleable
@@ -312,5 +342,9 @@ public class OrderService {
         if (closeResp.getCode() != Result.SUCCESS_CODE) {
             throw new BusinessException(closeResp.getCode(), closeResp.getMessage());
         }
+
+        // 5. 返回被关闭的订单:调用方在全局事务提交后,拿它发 CANCELLED 事件
+        return orderMapper.selectById(orderId);
     }
+
 }
