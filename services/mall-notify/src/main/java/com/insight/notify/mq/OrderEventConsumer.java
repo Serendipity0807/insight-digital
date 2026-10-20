@@ -26,7 +26,7 @@ public class OrderEventConsumer {
     public OrderEventConsumer(@Value("${rocketmq.name-server}") String nameServer,
                               ObjectMapper objectMapper,
                               NotifyService notifyService) throws MQClientException {
-        DefaultMQPushConsumer consumer = new DefaultMQPushConsumer("notify-order-event-consumer-group");
+        DefaultMQPushConsumer consumer = new DefaultMQPushConsumer("notify-order-event-consumer-group-v2");
         consumer.setNamesrvAddr(nameServer);
         // 从上次消费位置续读:重启不丢消息、不重复拉取
         consumer.setConsumeFromWhere(ConsumeFromWhere.CONSUME_FROM_LAST_OFFSET);

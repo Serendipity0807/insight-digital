@@ -11,7 +11,7 @@ spring:
   datasource:
     url: jdbc:mysql://localhost:3306/mall_notify?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
     username: root
-    password: 123456
+    password: 1234
     driver-class-name: com.mysql.cj.jdbc.Driver
 
 mybatis-plus:
@@ -20,4 +20,4 @@ mybatis-plus:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 
 rocketmq:
-  name-server: localhost:9876
+  name-server: 127.0.0.1:9876
