@@ -20,4 +20,6 @@ class Settings(BaseSettings):
     deepseek_base_url: str = "https://api.deepseek.com"
     deepseek_model: str = "deepseek-flash"
 
+    gateway_base_url: str = "http://localhost:8080"
+
 settings = Settings()
