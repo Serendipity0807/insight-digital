@@ -2,6 +2,7 @@ from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
 
 from app.config import settings
+from app.core.tools.faq_tools import answer_faq
 from app.core.tools.product_tools import get_product_detail
 from app.core.tools.search_tools import search_products
 
@@ -19,7 +20,7 @@ SYSTEM_PROMPT = (
 )
 
 # Agent 的工具箱:一个微服务域一个文件,将来加订单工具 = 加 order_tools.py
-tools = [get_product_detail, search_products]
+tools = [get_product_detail, search_products, answer_faq]
 
 agent = create_agent(llm, tools=tools, system_prompt=SYSTEM_PROMPT)
 
