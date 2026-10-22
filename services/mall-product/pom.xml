@@ -17,6 +17,10 @@
     <description>商品服务:SPU/SKU、分类、品牌</description>
 
     <dependencies>
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-api</artifactId>
+        </dependency>
         <!-- starter-web:一个坐标 = web + mvc + 内嵌 Tomcat + Jackson 整套 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

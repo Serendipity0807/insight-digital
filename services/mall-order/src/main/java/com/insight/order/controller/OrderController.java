@@ -1,13 +1,18 @@
 package com.insight.order.controller;
 
 import com.insight.common.mq.OrderEventMessage;
+import com.insight.common.result.PageResult;
 import com.insight.common.result.Result;
 import com.insight.order.dto.CreateOrderRequest;
+import com.insight.order.dto.OrderDetailVO;
+import com.insight.order.dto.OrderListItemVO;
 import com.insight.order.dto.OrderVO;
 import com.insight.order.entity.Order;
 import com.insight.order.mq.OrderEventProducer;
 import com.insight.order.service.OrderService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -52,6 +57,29 @@ public class OrderController {
         }
         return Result.success();
     }
+
+    /** 我的订单分页(登录用户;userId 由网关从 JWT 解出放进请求头)。
+     *  status 可选过滤:0已取消 10待支付 20已支付 30已发货 40已完成 50退款中 60已退款 */
+    @GetMapping("/page")
+    public Result<PageResult<OrderListItemVO>> page(
+            @RequestHeader("X-User-Id") Long userId,
+            @RequestParam(value = "page", defaultValue = "1")
+            @Min(value = 1, message = "页码必须从1开始") int page,
+            @RequestParam(value = "size", defaultValue = "10")
+            @Min(value = 1, message = "每页条数至少为1")
+            @Max(value = 50, message = "每页条数不能超过50") int size,
+            @RequestParam(value = "status", required = false) Integer status) {
+        return Result.success(orderService.page(userId, page, size, status));
+    }
+
+    /** 我的订单详情(登录用户,含明细快照)。不是自己的订单统一报错,防探测 */
+    @GetMapping("/{orderId}")
+    public Result<OrderDetailVO> detail(
+            @RequestHeader("X-User-Id") Long userId,
+            @PathVariable("orderId") Long orderId) {
+        return Result.success(orderService.detail(userId, orderId));
+    }
+
 
     /** 健康探活 */
     @GetMapping("/ping")

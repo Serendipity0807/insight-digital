@@ -34,3 +34,10 @@ spring:
 
 rocketmq:
   name-server: 127.0.0.1:9876
+
+# API 文档仅在 swagger profile 下开启。
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

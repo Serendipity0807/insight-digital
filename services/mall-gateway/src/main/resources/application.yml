@@ -50,3 +50,10 @@ spring:
 
 jwt:
   secret: insight-digital-jwt-secret-key-please-change-me-2026   # 必须与 mall-user 完全一致,否则验签全挂
+
+# API 文档仅在 swagger profile 下开启。
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

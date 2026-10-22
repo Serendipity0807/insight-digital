@@ -2,15 +2,15 @@ package com.insight.order.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.insight.common.exception.BusinessException;
 import com.insight.common.exception.ErrorCode;
+import com.insight.common.result.PageResult;
 import com.insight.common.result.Result;
 import com.insight.order.client.*;
-import com.insight.order.dto.CreateOrderRequest;
-import com.insight.order.dto.InternalOrderVO;
-import com.insight.order.dto.OrderVO;
+import com.insight.order.dto.*;
 import com.insight.order.entity.Order;
 import com.insight.order.entity.OrderItem;
 import com.insight.order.entity.OrderLog;
@@ -345,6 +345,59 @@ public class OrderService {
 
         // 5. 返回被关闭的订单:调用方在全局事务提交后,拿它发 CANCELLED 事件
         return orderMapper.selectById(orderId);
+    }
+
+    /** 我的订单分页(只给摘要)。status 传 null 查全部,否则按状态过滤 */
+    public PageResult<OrderListItemVO> page(Long userId, int page, int size, Integer status) {
+        LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<Order>()
+                .eq(Order::getUserId, userId)
+                .eq(status != null, Order::getStatus, status)
+                .orderByDesc(Order::getCreatedAt);
+        Page<Order> p = orderMapper.selectPage(new Page<>(page, size), wrapper);
+        List<OrderListItemVO> records = p.getRecords().stream().map(o -> {
+            OrderListItemVO vo = new OrderListItemVO();
+            vo.setOrderId(o.getId());
+            vo.setPayAmount(o.getPayAmount());
+            vo.setStatus(o.getStatus());
+            vo.setCreatedAt(o.getCreatedAt());
+            return vo;
+        }).toList();
+        return PageResult.of(p.getTotal(), records);
+    }
+
+    /** 我的订单详情(含明细快照):归属校验——不存在/不是自己的统一报错,防探测 */
+    public OrderDetailVO detail(Long userId, Long orderId) {
+        Order order = orderMapper.selectById(orderId);
+        if (order == null || !order.getUserId().equals(userId)) {
+            // 与 cancel() 同款:不区分"不存在"和"不是你的",不暴露别人订单的存在性
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID);
+        }
+        OrderDetailVO vo = new OrderDetailVO();
+        vo.setOrderId(order.getId());
+        vo.setTotalAmount(order.getTotalAmount());
+        vo.setDiscountAmount(order.getDiscountAmount());
+        vo.setPayAmount(order.getPayAmount());
+        vo.setStatus(order.getStatus());
+        vo.setAddressSnapshot(order.getAddressSnapshot());
+        vo.setRemark(order.getRemark());
+        vo.setCreatedAt(order.getCreatedAt());
+        vo.setPaymentTime(order.getPaymentTime());
+        vo.setShipTime(order.getShipTime());
+        vo.setCompleteTime(order.getCompleteTime());
+        List<OrderItem> items = orderItemMapper.selectList(
+                new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, orderId));
+        vo.setItems(items.stream().map(i -> {
+            OrderItemVO iv = new OrderItemVO();
+            iv.setSkuId(i.getSkuId());
+            iv.setSkuName(i.getSkuName());
+            iv.setSpec(i.getSpec());
+            iv.setImage(i.getImage());
+            iv.setPrice(i.getPrice());
+            iv.setQuantity(i.getQuantity());
+            iv.setTotalAmount(i.getTotalAmount());
+            return iv;
+        }).toList());
+        return vo;
     }
 
 }

@@ -16,6 +16,10 @@
     <description>网关:统一入口、路由转发(鉴权/限流在阶段④⑥接入)</description>
 
     <dependencies>
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
+        </dependency>
         <!-- 网关核心:Spring Cloud Gateway(WebFlux 响应式底座) -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>

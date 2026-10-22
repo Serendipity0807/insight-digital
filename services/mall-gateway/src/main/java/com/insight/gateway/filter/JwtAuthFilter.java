@@ -7,6 +7,8 @@ import com.insight.common.util.JwtUtil;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
@@ -46,10 +48,24 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private Environment environment;
+
+    private static final List<String> DOCUMENTED_SERVICES = List.of(
+            "mall-user", "mall-product", "mall-cart", "mall-order", "mall-inventory",
+            "mall-payment", "mall-search", "mall-promotion", "mall-notify");
+
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String path = exchange.getRequest().getURI().getPath();
         HttpMethod method = exchange.getRequest().getMethod();
+
+        // 只在 swagger profile 下放行文档读取，业务接口仍按原规则鉴权。
+        if (environment.acceptsProfiles(Profiles.of("swagger")) && HttpMethod.GET.equals(method)
+                && DOCUMENTED_SERVICES.stream().anyMatch(service ->
+                        path.equals("/docs/" + service + "/v3/api-docs"))) {
+            return passWithOptionalIdentity(exchange, chain);
+        }
 
         // 1. 白名单:不强制登录。但带了合法 token 仍验签并透传 X-User-Id——
         //    同一前缀下公开接口与需身份接口混居(如 promotion 下 goods 公开、result 要 userId),

@@ -15,3 +15,9 @@
 - `deploy/` 中间件部署
 - `frontend/` Vue 前端
 
+## Swagger UI 接口测试
+
+使用方法、登录授权和交易测试顺序见 [Swagger 测试指南](docs/swagger-testing.md)。
+给网关及需要测试的业务服务激活 `swagger` Spring profile 后，访问
+<http://localhost:8080/swagger-ui.html>，全部可用服务的接口会按中文业务分类显示，无需切换服务。
+

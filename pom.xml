@@ -41,11 +41,27 @@
         <jjwt.version>0.12.6</jjwt.version>
         <rocketmq.version>4.9.7</rocketmq.version>
         <elasticsearch.version>8.13.4</elasticsearch.version>
+        <springdoc.version>2.6.0</springdoc.version>
     </properties>
 
     <!-- 只"标价"不上菜:子模块引依赖不写版本号,从这继承 -->
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-common</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-api</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
             <!-- Spring Boot 全家桶版本清单 -->
             <dependency>
                 <groupId>org.springframework.boot</groupId>

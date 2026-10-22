@@ -13,3 +13,10 @@ spring:
       host: localhost
       port: 6379
       database: 2   # 按服务分逻辑库:购物车用 db2(设计文档第 9 节)
+
+# API 文档仅在 swagger profile 下开启。
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

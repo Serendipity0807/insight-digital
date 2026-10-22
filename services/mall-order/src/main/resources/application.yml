@@ -26,3 +26,10 @@ rocketmq:
   name-server: 127.0.0.1:9876
   # 延时等级(开源版固定 18 级):3 = 10 秒(本机演示),16 = 30 分钟(生产)
   close-delay-level: 16
+
+# API 文档仅在 swagger profile 下开启。
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
